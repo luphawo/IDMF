@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integrated Demand Management Platform</title>
+    <!-- Google Fonts for premium typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- SIDEBAR NAVIGATION -->
+    <aside>
+        <div class="logo-container">
+            <div class="logo-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+            </div>
+            <div class="logo-text">
+                <h1>IDM Portal</h1>
+                <span>UNISA Demand Governance</span>
+            </div>
+        </div>
+
+        <ul class="nav-links">
+            <li class="nav-item active" onclick="switchView('overview')">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+                Overview Dashboard
+            </li>
+            <li class="nav-item" onclick="switchView('initiatives-list')">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+                Initiatives Registry
+            </li>
+            <li class="nav-item" onclick="switchView('intake-form')">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Register Initiative
+            </li>
+            <li class="nav-item" onclick="switchView('reporting')">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                Executive Reports
+            </li>
+        </ul>
+
+        <!-- IDENTITY SWITCH PANEL -->
+        <div class="identity-switch">
+            <h3>🔑 Switch Active Persona</h3>
+            <select class="identity-select" id="personaSelect" onchange="changePersona()">
+                <option value="requester" data-name="Jane Doe" data-email="jane.doe@unisa.ac.za" data-unit="Academic Affairs" data-role="Initiative Requester">Jane Doe (Requester)</option>
+                <option value="owner" data-name="Vusi Executive" data-email="vusi.executive@unisa.ac.za" data-unit="Deputy Registrar Portfolio" data-role="Initiative Owner">Vusi Executive (Owner)</option>
+                <option value="planner" data-name="Sello Demand" data-email="sello.planner@unisa.ac.za" data-unit="ICT PMO" data-role="Demand Planner">Sello Demand (Planner)</option>
+                <option value="arch" data-name="Dev Solutions" data-email="dev.arch@unisa.ac.za" data-unit="Enterprise Architecture" data-role="Solutions Architect">Dev Solutions (Architect)</option>
+                <option value="secretariat" data-name="Naledi Steerco" data-email="naledi.steerco@unisa.ac.za" data-unit="ICT SteerCo" data-role="ICT SteerCo Secretariat">Naledi SteerCo (Secretariat)</option>
+            </select>
+        </div>
+    </aside>
+
+    <!-- MAIN PORTAL BODY -->
+    <main>
+        <header>
+            <div class="welcome-section">
+                <h2 id="headerTitle">Overview Governance Dashboard</h2>
+                <p id="headerSubtitle">Real-time status tracking for UNISA Strategic Initiatives</p>
+            </div>
+            <button class="action-btn" onclick="switchView('intake-form')">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>
+                Register Initiative
+            </button>
+        </header>
+
+        <!-- ==================== VIEW: OVERVIEW ==================== -->
+        <section id="view-overview" class="view-section active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-title">Registered Initiatives</span>
+                    <span class="stat-val" id="statTotal">0</span>
+                </div>
+                <div class="stat-card warning">
+                    <span class="stat-title">Pending Governance Actions</span>
+                    <span class="stat-val" id="statPending">0</span>
+                </div>
+                <div class="stat-card success">
+                    <span class="stat-title">Approved Projects</span>
+                    <span class="stat-val" id="statApproved">0</span>
+                </div>
+                <div class="stat-card danger">
+                    <span class="stat-title">Declined/Parked</span>
+                    <span class="stat-val" id="statDeclined">0</span>
+                </div>
+            </div>
+
+            <div class="welcome-section" style="margin-bottom: 20px;">
+                <h3>Active Governance Action Inbox</h3>
+                <p style="font-size: 0.85rem; color: var(--text-secondary);">Initiatives awaiting decision/inputs under your currently active persona role.</p>
+            </div>
+            
+            <div class="card-list" id="actionInboxList">
+                <!-- Actions rendered dynamically by app.js -->
+            </div>
+        </section>
+
+        <!-- ==================== VIEW: INITIATIVES LIST ==================== -->
+        <section id="view-initiatives-list" class="view-section">
+            <div class="card-list" id="fullInitiativesList">
+                <!-- Full list rendered dynamically -->
+            </div>
+        </section>
+
+        <!-- ==================== VIEW: INTAKE FORM ==================== -->
+        <section id="view-intake-form" class="view-section">
+            <div class="form-card">
+                <div style="margin-bottom: 30px;">
+                    <h3>Register New Governance Initiative Request</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary);">Please complete all strategic alignment metadata. Mandatory fields apply (UNISA Rule UC1).</p>
+                </div>
+                <form id="intakeForm" onsubmit="submitIntakeForm(event)">
+                    <div class="form-grid">
+                        <div class="form-group full-width">
+                            <label>Initiative Name / Title *</label>
+                            <input type="text" class="form-input" id="formName" required placeholder="e.g. Integrated Academic Enrollment Digitization Project">
+                        </div>
+                        <div class="form-group">
+                            <label>Nominated Executive Owner Name *</label>
+                            <input type="text" class="form-input" id="formOwnerName" required placeholder="e.g. Vusi Executive">
+                        </div>
+                        <div class="form-group">
+                            <label>Nominated Owner UNISA Email *</label>
+                            <input type="email" class="form-input" id="formOwnerEmail" required placeholder="e.g. vusi.executive@unisa.ac.za">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>Initiative Background (Reason for Change) *</label>
+                            <textarea class="form-input" id="formBackground" required placeholder="Outline why this change is necessary and current operational bottlenecks..."></textarea>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>Initiative Objective *</label>
+                            <textarea class="form-input" id="formObjective" required placeholder="Define the primary operational goals of this initiative..."></textarea>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>Potential Initiative Benefits (Measurable, Tangible and Intangible) *</label>
+                            <textarea class="form-input" id="formBenefits" required placeholder="Describe what institutional value and capacity benefits this delivers..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Strategic Alignment Pillar/Enabler *</label>
+                            <select class="form-input" id="formStrategy" required>
+                                <option value="">-- Select Pillar/Enabler --</option>
+                                <option value="Pillar 1: Advance Technology Mediated, Quality Learning and Teaching">Pillar 1: Advance Technology Mediated, Quality Learning and Teaching</option>
+                                <option value="Pillar 2: Propel Research Innovation">Pillar 2: Propel Research Innovation</option>
+                                <option value="Pillar 3: Pivot Engaged Scholarship and Global Impact">Pillar 3: Pivot Engaged Scholarship and Global Impact</option>
+                                <option value="Pillar 4: Strengthen Student Support Services">Pillar 4: Strengthen Student Support Services</option>
+                                <option value="Pillar 5: Resourcing our Futures">Pillar 5: Resourcing our Futures</option>
+                                <option value="Enabler 1: People">Enabler 1: People</option>
+                                <option value="Enabler 2: Digitalization and Digitization">Enabler 2: Digitalization and Digitization</option>
+                                <option value="Enabler 3: Governance, Reporting and Management Systems">Enabler 3: Governance, Reporting and Management Systems</option>
+                                <option value="Enabler 4: Financial Sustainability">Enabler 4: Financial Sustainability</option>
+                                <option value="Enabler 5: Infrastructure and Operations">Enabler 5: Infrastructure and Operations</option>
+                            </select>
+                        </div>
+                        
+                        <!-- CASCADING CAPABILITY CLUSTERS -->
+                        <div class="form-group">
+                            <label>Capability Type *</label>
+                            <select class="form-input" id="formCapType" required onchange="populateCapGroups()">
+                                <option value="">-- Select Capability Type --</option>
+                                <option value="Learning & Teaching">Learning & Teaching</option>
+                                <option value="Research">Research</option>
+                                <option value="Enabling">Enabling</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Capability Group *</label>
+                            <select class="form-input" id="formCapGroup" required onchange="populateCapTitles()">
+                                <option value="">-- Select Group --</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Capability Title *</label>
+                            <select class="form-input" id="formCapTitle" required>
+                                <option value="">-- Select Title --</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group full-width">
+                            <label>High Level Impact Analysis (Operational/Architecture impact) *</label>
+                            <textarea class="form-input" id="formImpact" required placeholder="Describe systems, integrations, or organizational models impacted by this change..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Budget Estimate (Rand R) *</label>
+                            <input type="number" class="form-input" id="formBudget" required placeholder="e.g. 500000">
+                        </div>
+                        <div class="form-group">
+                            <label>Project Time Estimate *</label>
+                            <input type="text" class="form-input" id="formTime" required placeholder="e.g. 6 Months, 12 Months">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>Affected Parties / Stakeholders *</label>
+                            <input type="text" class="form-input" id="formAffected" required placeholder="e.g. All Registration Staff, ICT division, finance branch">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="action-btn" style="background: rgba(255,255,255,0.05); color: var(--text-primary);" onclick="switchView('overview')">Cancel</button>
+                        <button type="submit" class="action-btn">Submit Request</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW: INITIATIVE DETAIL ==================== -->
+        <section id="view-initiative-detail" class="view-section">
+            <div class="detail-grid">
+                <div class="detail-main">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 20px;">
+                        <div>
+                            <span class="badge Submitted" id="detailBadge">Submitted</span>
+                            <h2 id="detailTitle" style="margin-top: 10px; font-size: 1.5rem;">NextGen Digital Learning Portal</h2>
+                            <p id="detailMeta" style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px;">IDM-2026-0001 | Registered on 26/05/2026</p>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <div>
+                            <strong style="color: var(--text-secondary); font-size: 0.85rem;">Initiative Background:</strong>
+                            <p id="detailBackground" style="margin-top: 6px; font-size: 0.95rem; line-height: 1.6;"></p>
+                        </div>
+                        <div>
+                            <strong style="color: var(--text-secondary); font-size: 0.85rem;">Objectives:</strong>
+                            <p id="detailObjective" style="margin-top: 6px; font-size: 0.95rem; line-height: 1.6;"></p>
+                        </div>
+                        <div>
+                            <strong style="color: var(--text-secondary); font-size: 0.85rem;">Potential Strategic Benefits:</strong>
+                            <p id="detailBenefits" style="margin-top: 6px; font-size: 0.95rem; line-height: 1.6;"></p>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; background: rgba(0,0,0,0.15); padding: 16px; border-radius: 12px; border: 1px solid var(--border);">
+                            <div><strong>Strategic Alignment:</strong> <span id="detailStrategy"></span></div>
+                            <div><strong>Capability Cluster:</strong> <span id="detailCapCluster"></span></div>
+                            <div><strong>Estimated Budget:</strong> <span id="detailBudget"></span></div>
+                            <div><strong>Duration Estimate:</strong> <span id="detailTime"></span></div>
+                        </div>
+
+                        <div id="detailExtraDocs" style="display: none; flex-direction: column; gap: 8px;">
+                            <strong>📁 Associated Documentation Libraries (SharePoint Integrated)</strong>
+                            <div id="businessCaseLink" style="padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; font-size: 0.85rem;"></div>
+                            <div id="solarchReportLink" style="padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; font-size: 0.85rem;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-sidebar">
+                    <!-- ACTION INTERFACES DYNAMIC PER ROLE -->
+                    <div class="action-card" id="roleActionCard">
+                        <h3>⚡ Action Workstation</h3>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;">Perform current workflow lifecycle stage transition.</p>
+                        <div id="actionFieldsContainer">
+                            <!-- Action buttons, inputs, files per role -->
+                        </div>
+                    </div>
+
+                    <!-- WORKFLOW HISTORY LOGS FOR AUDITABILITY -->
+                    <div class="timeline-card">
+                        <h3>📜 Workflow History Trace</h3>
+                        <div class="timeline" id="detailHistoryTimeline" style="margin-top: 20px;">
+                            <!-- Dynamically loaded -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW: REPORTING ==================== -->
+        <section id="view-reporting" class="view-section">
+            <div class="stats-grid">
+                <div class="stat-card success">
+                    <span class="stat-title">Institutional Pipeline Value</span>
+                    <span class="stat-val" id="reportValue">R 0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-title">SLA Compliance Target</span>
+                    <span class="stat-val">97.8%</span>
+                </div>
+                <div class="stat-card warning">
+                    <span class="stat-title">Avg Governance Stage Time</span>
+                    <span class="stat-val">4.2 Days</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-title">Strategic Traceability</span>
+                    <span class="stat-val">100%</span>
+                </div>
+            </div>
+
+            <div class="form-card">
+                <h3>Executive Portfolio Governance Report</h3>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 24px;">Generated on demand. Deeply integrated with Microsoft Power BI feeds.</p>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;" id="reportTable">
+                        <thead>
+                            <tr style="border-bottom: 2px solid var(--border); padding-bottom: 12px; color: var(--text-secondary);">
+                                <th style="padding: 12px;">Request No</th>
+                                <th style="padding: 12px;">Initiative Name</th>
+                                <th style="padding: 12px;">Requester</th>
+                                <th style="padding: 12px;">Strategy Pillar</th>
+                                <th style="padding: 12px;">Status</th>
+                                <th style="padding: 12px;">Estimated Budget</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
