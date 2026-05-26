@@ -822,16 +822,16 @@ function classifyInitiative(id) {
     matrix.style.display = 'block';
 
     const pillars = [
-        { name: "Pillar 1: Advance Technology Mediated, Quality Learning and Teaching", weight: 15 },
+        { name: "Pillar 1: Advance Technology Mediated, Quality Learning and Teaching", weight: 17 },
         { name: "Pillar 2: Propel Research Innovation", weight: 15 },
-        { name: "Pillar 3: Pivot Engaged Scholarship and Global Impact", weight: 15 },
-        { name: "Pillar 4: Strengthen Student Support Services", weight: 15 },
-        { name: "Pillar 5: Resourcing our Futures", weight: 15 },
-        { name: "Enabler 1: People", weight: 5 },
-        { name: "Enabler 2: Digitalization and Digitization", weight: 5 },
-        { name: "Enabler 3: Governance, Reporting and Management Systems", weight: 5 },
-        { name: "Enabler 4: Financial Sustainability", weight: 5 },
-        { name: "Enabler 5: Infrastructure and Operations", weight: 5 }
+        { name: "Pillar 3: Pivot Engaged Scholarship and Global Impact", weight: 13 },
+        { name: "Pillar 4: Strengthen Student Support Services", weight: 11 },
+        { name: "Pillar 5: Resourcing our Futures", weight: 9 },
+        { name: "Enabler 1: People", weight: 7 },
+        { name: "Enabler 2: Digitalization and Digitization", weight: 7 },
+        { name: "Enabler 3: Governance, Reporting and Management Systems", weight: 7 },
+        { name: "Enabler 4: Financial Sustainability", weight: 7 },
+        { name: "Enabler 5: Infrastructure and Operations", weight: 7 }
     ];
 
     const saved = initiative.strategic_classification?.scores || {};
@@ -863,7 +863,7 @@ function classifyInitiative(id) {
                 <td>${pillar.weight}</td>
                 <td>
                     <select class="sc-score-select" data-pillar="${pillar.name}" onchange="updateSCScore('${id}', this)">
-                        ${[0,1,2,3,4,5].map(s => `<option value="${s}" ${s === savedScore ? 'selected' : ''}>${s}</option>`).join('')}
+                        ${[0,1,5,10].map(s => `<option value="${s}" ${s === savedScore ? 'selected' : ''}>${s === 0 ? 'None (0)' : s === 1 ? 'Low (1)' : s === 5 ? 'Moderate (5)' : 'High (10)'}</option>`).join('')}
                     </select>
                 </td>
                 <td id="w_${i}">${weighted}</td>
@@ -909,16 +909,16 @@ function updateSCScore(id, select) {
     window._pendingSCScores[pillar] = score;
 
     const pillars = [
-        { name: "Pillar 1: Advance Technology Mediated, Quality Learning and Teaching", weight: 15 },
+        { name: "Pillar 1: Advance Technology Mediated, Quality Learning and Teaching", weight: 17 },
         { name: "Pillar 2: Propel Research Innovation", weight: 15 },
-        { name: "Pillar 3: Pivot Engaged Scholarship and Global Impact", weight: 15 },
-        { name: "Pillar 4: Strengthen Student Support Services", weight: 15 },
-        { name: "Pillar 5: Resourcing our Futures", weight: 15 },
-        { name: "Enabler 1: People", weight: 5 },
-        { name: "Enabler 2: Digitalization and Digitization", weight: 5 },
-        { name: "Enabler 3: Governance, Reporting and Management Systems", weight: 5 },
-        { name: "Enabler 4: Financial Sustainability", weight: 5 },
-        { name: "Enabler 5: Infrastructure and Operations", weight: 5 }
+        { name: "Pillar 3: Pivot Engaged Scholarship and Global Impact", weight: 13 },
+        { name: "Pillar 4: Strengthen Student Support Services", weight: 11 },
+        { name: "Pillar 5: Resourcing our Futures", weight: 9 },
+        { name: "Enabler 1: People", weight: 7 },
+        { name: "Enabler 2: Digitalization and Digitization", weight: 7 },
+        { name: "Enabler 3: Governance, Reporting and Management Systems", weight: 7 },
+        { name: "Enabler 4: Financial Sustainability", weight: 7 },
+        { name: "Enabler 5: Infrastructure and Operations", weight: 7 }
     ];
 
     let total = 0;
@@ -939,16 +939,16 @@ async function submitStrategicClassification(id) {
     const scores = window._pendingSCScores || {};
 
     const pillars = [
-        { name: "Pillar 1: Advance Technology Mediated, Quality Learning and Teaching", weight: 15 },
+        { name: "Pillar 1: Advance Technology Mediated, Quality Learning and Teaching", weight: 17 },
         { name: "Pillar 2: Propel Research Innovation", weight: 15 },
-        { name: "Pillar 3: Pivot Engaged Scholarship and Global Impact", weight: 15 },
-        { name: "Pillar 4: Strengthen Student Support Services", weight: 15 },
-        { name: "Pillar 5: Resourcing our Futures", weight: 15 },
-        { name: "Enabler 1: People", weight: 5 },
-        { name: "Enabler 2: Digitalization and Digitization", weight: 5 },
-        { name: "Enabler 3: Governance, Reporting and Management Systems", weight: 5 },
-        { name: "Enabler 4: Financial Sustainability", weight: 5 },
-        { name: "Enabler 5: Infrastructure and Operations", weight: 5 }
+        { name: "Pillar 3: Pivot Engaged Scholarship and Global Impact", weight: 13 },
+        { name: "Pillar 4: Strengthen Student Support Services", weight: 11 },
+        { name: "Pillar 5: Resourcing our Futures", weight: 9 },
+        { name: "Enabler 1: People", weight: 7 },
+        { name: "Enabler 2: Digitalization and Digitization", weight: 7 },
+        { name: "Enabler 3: Governance, Reporting and Management Systems", weight: 7 },
+        { name: "Enabler 4: Financial Sustainability", weight: 7 },
+        { name: "Enabler 5: Infrastructure and Operations", weight: 7 }
     ];
 
     let total = 0;
@@ -1045,14 +1045,11 @@ function calculateSteercoScore(id) {
     const dimensions = [
         { key: 'ict_demand', label: 'Type of ICT Demand', desc: 'Complexity of the ICT demand' },
         { key: 'effort', label: 'Effort', desc: 'Estimated effort required' },
-        { key: 'system_readiness', label: 'System Readiness', desc: 'Auto-derived from Strategic Classification' },
+        { key: 'system_readiness', label: 'System Readiness', desc: 'Most appropriate system option' },
         { key: 'cost', label: 'Cost', desc: 'Financial cost impact' },
         { key: 'likelihood_success', label: 'Likelihood of Success', desc: 'Probability of successful delivery' },
-        { key: 'resources', label: 'Resources', desc: 'Resource availability' }
+        { key: 'resources', label: 'Resources', desc: 'Human Resources required' }
     ];
-
-    const scoreLabels = ['Minimal (1)', 'Low (3)', 'Medium (5)', 'High (8)', 'Very High (10)'];
-    const scoreValues = [1, 3, 5, 8, 10];
 
     let html = `
         <h3 style="margin-bottom:8px;">SteerCo Value & Ease Scoring Matrix</h3>
@@ -1072,8 +1069,63 @@ function calculateSteercoScore(id) {
 
     dimensions.forEach(dim => {
         const val = window._pendingSteercoScores[dim.key];
-        const idx = scoreValues.indexOf(val);
-        const selectedIdx = idx >= 0 ? idx : 2;
+
+        let optionsHtml = '';
+        if (dim.key === 'ict_demand') {
+            const ictOptions = [
+                { value: 1, label: 'Tactical Demand (1)' },
+                { value: 5, label: 'Operational Demand (5)' },
+                { value: 10, label: 'Strategic Demand (10)' }
+            ];
+            optionsHtml = ictOptions.map(o =>
+                `<option value="${o.value}" ${o.value === val ? 'selected' : ''}>${o.label}</option>`
+            ).join('');
+        } else if (dim.key === 'effort') {
+            const effortOptions = [
+                { value: 1, label: '> 6 months (1)' },
+                { value: 5, label: '> 2 months and \u2264 6 months (5)' },
+                { value: 10, label: '\u2264 2 months (10)' }
+            ];
+            optionsHtml = effortOptions.map(o =>
+                `<option value="${o.value}" ${o.value === val ? 'selected' : ''}>${o.label}</option>`
+            ).join('');
+        } else if (dim.key === 'system_readiness') {
+            const srOptions = [
+                { value: 1, label: 'Major custom dev required (1)' },
+                { value: 5, label: 'Minor custom dev required (5)' },
+                { value: 10, label: 'Off-The-Shelf system (10)' }
+            ];
+            optionsHtml = srOptions.map(o =>
+                `<option value="${o.value}" ${o.value === val ? 'selected' : ''}>${o.label}</option>`
+            ).join('');
+        } else if (dim.key === 'cost') {
+            const costOptions = [
+                { value: 1, label: '> R5m (1)' },
+                { value: 5, label: '> R1m and \u2264 R5m (5)' },
+                { value: 10, label: '\u2264 R1m (10)' }
+            ];
+            optionsHtml = costOptions.map(o =>
+                `<option value="${o.value}" ${o.value === val ? 'selected' : ''}>${o.label}</option>`
+            ).join('');
+        } else if (dim.key === 'likelihood_success') {
+            const lsOptions = [
+                { value: 1, label: 'Even odds (1)' },
+                { value: 5, label: 'Good odds (5)' },
+                { value: 10, label: 'Great odds (10)' }
+            ];
+            optionsHtml = lsOptions.map(o =>
+                `<option value="${o.value}" ${o.value === val ? 'selected' : ''}>${o.label}</option>`
+            ).join('');
+        } else if (dim.key === 'resources') {
+            const resOptions = [
+                { value: 1, label: '> 10 (1)' },
+                { value: 5, label: '> 6 and \u2264 10 (5)' },
+                { value: 10, label: '\u2264 6 (10)' }
+            ];
+            optionsHtml = resOptions.map(o =>
+                `<option value="${o.value}" ${o.value === val ? 'selected' : ''}>${o.label}</option>`
+            ).join('');
+        }
 
         html += `
             <tr>
@@ -1081,9 +1133,7 @@ function calculateSteercoScore(id) {
                 <td style="font-size:0.85rem;color:var(--text-secondary);">${dim.desc}</td>
                 <td>
                     <select class="sc-score-select" onchange="updateSteercoScore('${dim.key}', this.value)">
-                        ${scoreLabels.map((label, i) =>
-                            `<option value="${scoreValues[i]}" ${i === selectedIdx ? 'selected' : ''}>${label}</option>`
-                        ).join('')}
+                        ${optionsHtml}
                     </select>
                 </td>
             </tr>

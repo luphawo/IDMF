@@ -432,21 +432,33 @@ router.post('/:id/strategic-classification', (req: AuthenticatedRequest, res: Re
             return res.status(404).json({ success: false, message: "Initiative not found" });
         }
 
-        // Calculate total weighted score
-        const weights: Record<string, number> = {
-            pillar1: 17, pillar2: 15, pillar3: 13, pillar4: 11, pillar5: 9,
-            enabler1: 7, enabler2: 7, enabler3: 7, enabler4: 7, enabler5: 7
+        // Calculate total weighted score with correct weights
+        const pillarWeights: Record<string, number> = {
+            "Pillar 1: Advance Technology Mediated, Quality Learning and Teaching": 17,
+            "Pillar 2: Propel Research Innovation": 15,
+            "Pillar 3: Pivot Engaged Scholarship and Global Impact": 13,
+            "Pillar 4: Strengthen Student Support Services": 11,
+            "Pillar 5: Resourcing our Futures": 9,
+            "Enabler 1: People": 7,
+            "Enabler 2: Digitalization and Digitization": 7,
+            "Enabler 3: Governance, Reporting and Management Systems": 7,
+            "Enabler 4: Financial Sustainability": 7,
+            "Enabler 5: Infrastructure and Operations": 7
         };
 
         let totalWeightedScore = 0;
-        for (const [key, weight] of Object.entries(weights)) {
-            const score = scores[key] || 0;
-            totalWeightedScore += (score * weight) / 10;
+        for (const [key, weight] of Object.entries(pillarWeights)) {
+            const s = scores[key] || 0;
+            totalWeightedScore += (s * weight) / 10;
         }
+        totalWeightedScore = Math.round(totalWeightedScore * 100) / 100;
+
+        const category = totalWeightedScore < 25 ? 'Minor' : totalWeightedScore >= 75 ? 'High' : 'Medium';
 
         const classification = {
-            ...scores,
-            total_weighted_score: Math.round(totalWeightedScore * 100) / 100,
+            scores,
+            total_weighted_score: totalWeightedScore,
+            category,
             classification_date: new Date().toISOString()
         };
 
@@ -476,9 +488,13 @@ router.post('/:id/steerco-scoring', (req: AuthenticatedRequest, res: Response) =
     try {
         const user = req.user!;
         const { id } = req.params;
-        const { scores } = req.body;
+        const d = req.body;
 
-        if (!scores) {
+        // Accept both flat payload and nested scores/dimensions
+        const scores = d.scores || d.dimensions || d;
+        const hasScores = scores.ict_demand !== undefined || scores.effort !== undefined;
+
+        if (!hasScores) {
             return res.status(400).json({ success: false, message: "SteerCo scoring scores are required." });
         }
 
@@ -497,24 +513,25 @@ router.post('/:id/steerco-scoring', (req: AuthenticatedRequest, res: Response) =
             else { strategicScore = 1; strategicLabel = 'Small (Minor)'; }
         }
 
-        const value = strategicScore + (scores.type_of_ict_demand || 0);
-        const ease = (scores.effort || 0) + (scores.system_readiness || 0) + (scores.cost || 0) + (scores.likelihood_of_success || 0) + (scores.resources || 0);
+        const ict_demand = scores.ict_demand || scores.type_of_ict_demand || 0;
+        const effort = scores.effort || 0;
+        const system_readiness = scores.system_readiness || 0;
+        const cost = scores.cost || 0;
+        const likelihood_success = scores.likelihood_success || scores.likelihood_of_success || 0;
+        const resources = scores.resources || 0;
+
+        const value = strategicScore + ict_demand;
+        const ease = effort + system_readiness + cost + likelihood_success + resources;
 
         const steercoScoring = {
             strategic_classification_score: strategicScore,
             strategic_classification_label: strategicLabel,
-            type_of_ict_demand: scores.type_of_ict_demand || 0,
-            type_of_ict_demand_label: scores.type_of_ict_demand_label || '',
-            effort: scores.effort || 0,
-            effort_label: scores.effort_label || '',
-            system_readiness: scores.system_readiness || 0,
-            system_readiness_label: scores.system_readiness_label || '',
-            cost: scores.cost || 0,
-            cost_label: scores.cost_label || '',
-            likelihood_of_success: scores.likelihood_of_success || 0,
-            likelihood_of_success_label: scores.likelihood_of_success_label || '',
-            resources: scores.resources || 0,
-            resources_label: scores.resources_label || '',
+            ict_demand,
+            effort,
+            system_readiness,
+            cost,
+            likelihood_success,
+            resources,
             value,
             ease,
             scoring_date: new Date().toISOString()
@@ -530,7 +547,7 @@ router.post('/:id/steerco-scoring', (req: AuthenticatedRequest, res: Response) =
             to_status: initiative.status,
             updated_by_email: user.email,
             updated_by_name: user.name,
-            comments: `SteerCo Scoring completed. Value: ${value} (SC: ${strategicScore} + ICT Demand: ${scores.type_of_ict_demand || 0}), Ease: ${ease} (Effort: ${scores.effort || 0} + Readiness: ${scores.system_readiness || 0} + Cost: ${scores.cost || 0} + Success: ${scores.likelihood_of_success || 0} + Resources: ${scores.resources || 0})`
+            comments: `SteerCo Scoring completed. Value: ${value} (SC: ${strategicScore} + ICT Demand: ${ict_demand}), Ease: ${ease} (Effort: ${effort} + Readiness: ${system_readiness} + Cost: ${cost} + Success: ${likelihood_success} + Resources: ${resources})`
         });
 
         res.json({ success: true, message: `SteerCo Scoring saved. Value: ${value}, Ease: ${ease}`, data: updated });

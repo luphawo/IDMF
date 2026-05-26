@@ -1,0 +1,7 @@
+Dimension	Description
+Type of ICT Demand	Complexity of the demand
+Effort	Estimated effort required
+System Readiness	Most appropriate system option
+Cost	Financial cost impact
+Likelihood of Success	Probability of successful delivery
+Resources	Resource availability
