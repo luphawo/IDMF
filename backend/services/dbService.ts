@@ -61,8 +61,43 @@ export interface Initiative {
     
     // UC7 SteerCo Scheduling & Priority Rating
     steerco_meeting_date?: string;
-    project_priority_score?: number; // 1-100
-    project_rating?: string; // 'High' | 'Medium' | 'Low'
+
+    // SteerCo Scoring (Value & Ease from Excel matrix)
+    steerco_scoring?: {
+        strategic_classification_score: number; // 1 | 5 | 10 (derived from Strategic Classification)
+        strategic_classification_label: string;
+        type_of_ict_demand: number;
+        type_of_ict_demand_label: string;
+        effort: number;
+        effort_label: string;
+        system_readiness: number;
+        system_readiness_label: string;
+        cost: number;
+        cost_label: string;
+        likelihood_of_success: number;
+        likelihood_of_success_label: string;
+        resources: number;
+        resources_label: string;
+        value: number; // strategic_classification_score + type_of_ict_demand
+        ease: number;  // effort + system_readiness + cost + likelihood_of_success + resources
+        scoring_date: string;
+    }
+
+    // Strategic Classification Scoring (Excel-based matrix)
+    strategic_classification?: {
+        pillar1_score: number;
+        pillar2_score: number;
+        pillar3_score: number;
+        pillar4_score: number;
+        pillar5_score: number;
+        enabler1_score: number;
+        enabler2_score: number;
+        enabler3_score: number;
+        enabler4_score: number;
+        enabler5_score: number;
+        total_weighted_score: number;
+        classification_date: string;
+    }
 }
 
 export interface WorkflowHistory {

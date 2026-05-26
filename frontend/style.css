@@ -1,18 +1,18 @@
 /* premium IDM Platform modern design tokens */
 :root {
-    --bg-primary: #0b0f19;
-    --bg-secondary: rgba(22, 28, 45, 0.7);
-    --bg-card: rgba(30, 41, 59, 0.45);
+    --bg-primary: #f1f5f9;
+    --bg-secondary: rgba(255, 255, 255, 0.8);
+    --bg-card: rgba(255, 255, 255, 0.9);
     --accent: #2563eb;
     --accent-hover: #1d4ed8;
-    --accent-glow: rgba(37, 99, 235, 0.15);
+    --accent-glow: rgba(37, 99, 235, 0.2);
     --success: #10b981;
-    --success-glow: rgba(16, 185, 129, 0.1);
+    --success-glow: rgba(16, 185, 129, 0.15);
     --warning: #f59e0b;
     --danger: #ef4444;
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --border: rgba(148, 163, 184, 0.12);
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --border: rgba(100, 116, 139, 0.2);
     --font-sans: 'Outfit', 'Inter', -apple-system, sans-serif;
     --glass-blur: blur(12px);
 }
@@ -119,7 +119,7 @@ aside {
 
 /* Identity Simulator Switcher styling */
 .identity-switch {
-    background: rgba(30, 41, 59, 0.6);
+    background: rgba(255, 255, 255, 0.6);
     border: 1px solid var(--border);
     padding: 16px;
     border-radius: 12px;
@@ -136,7 +136,7 @@ aside {
 
 .identity-select {
     width: 100%;
-    background: #0f172a;
+    background: #ffffff;
     border: 1px solid var(--border);
     color: var(--text-primary);
     padding: 10px;
@@ -307,15 +307,15 @@ header {
     font-weight: 600;
 }
 
-.badge.Draft { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
-.badge.Submitted { background: rgba(37, 99, 235, 0.15); color: #93c5fd; }
-.badge.Accepted { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
-.badge.Reviewed { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; }
-.badge.SolArch { background: rgba(245, 158, 11, 0.15); color: #fde047; }
-.badge.Assessed { background: rgba(236, 72, 153, 0.15); color: #fbcfe8; }
-.badge.Recommended { background: rgba(14, 165, 233, 0.15); color: #bae6fd; }
-.badge.Approved { background: rgba(16, 185, 129, 0.25); color: #34d399; }
-.badge.Declined { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
+.badge.Draft { background: #e2e8f0; color: #475569; }
+.badge.Submitted { background: #dbeafe; color: #1d4ed8; }
+.badge.Accepted { background: #d1fae5; color: #059669; }
+.badge.Reviewed { background: #ede9fe; color: #7c3aed; }
+.badge.SolArch { background: #fef3c7; color: #d97706; }
+.badge.Assessed { background: #fce7f3; color: #db2777; }
+.badge.Recommended { background: #e0f2fe; color: #0284c7; }
+.badge.Approved { background: #a7f3d0; color: #047857; }
+.badge.Declined { background: #fee2e2; color: #dc2626; }
 
 /* Dynamic Intake Form Styling */
 .form-card {
@@ -350,7 +350,7 @@ header {
 }
 
 .form-input {
-    background: rgba(15, 23, 42, 0.8);
+    background: #ffffff;
     border: 1px solid var(--border);
     color: var(--text-primary);
     padding: 12px 16px;
@@ -459,4 +459,110 @@ textarea.form-input {
 
 .timeline-desc {
     font-size: 0.85rem;
+}
+
+/* Strategic Classification Matrix Table */
+.classification-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.classification-table th {
+    text-align: left;
+    padding: 12px;
+    border-bottom: 2px solid var(--border);
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.classification-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.classification-table tbody tr:hover {
+    background: rgba(37, 99, 235, 0.05);
+}
+
+.classification-table tfoot td {
+    border-top: 2px solid var(--accent);
+    padding: 12px;
+    color: var(--text-primary);
+}
+
+.sc-score-select {
+    background: #ffffff;
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 8px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.sc-score-select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+
+/* Toast notification overlay */
+.toast-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.toast-box {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    text-align: center;
+    animation: toastSlide 0.3s ease-out;
+}
+
+.toast-icon {
+    font-size: 2.5rem;
+    margin-bottom: 12px;
+}
+
+.toast-box p {
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+.toast-box .toast-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 10px 32px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+
+.toast-box .toast-btn:hover {
+    background: var(--accent-hover);
+}
+
+@keyframes toastSlide {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
 }

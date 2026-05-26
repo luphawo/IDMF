@@ -1,0 +1,15 @@
+Select Jane Doe (Requester) from the bottom-left dropdown and register an initiative request.
+
+Switch to Vusi Executive (Owner) to review, comment on, and Accept the initiative request.
+
+Switch to Sello Demand (Planner) to assign the accepted request to a solutions architect reviewer.
+
+Watch your terminal/command-line task console dynamically print out simulated Microsoft Teams Adaptive Cards and Power Automate webhook payloads with every action!
+
+
+
+
+Ask questions until you 95% confident that you understand the task. 
+
+
+test all the changes made and indicate any errors found
