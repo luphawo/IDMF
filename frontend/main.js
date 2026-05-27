@@ -106,17 +106,21 @@ const WORKFLOW_STATES = {
     },
     SolArch: {
         allowedRoles: ['Solutions Architect'],
-        render: () => ({
-            fields: [
-                { type: 'select', id: 'assessReportStatus', label: 'SolArch Assessment Report Status *', options: [
-                    { value: 'In-Progress', label: 'In-Progress' },
-                    { value: 'Completed', label: 'Completed (Uploaded to SharePoint)' }
-                ]}
-            ],
-            actions: [
-                { label: 'Submit Assessment', action: 'assess', arg: null, style: 'primary', confirm: false }
-            ]
-        })
+        render: (init) => {
+            const scDone = !!init.strategic_classification;
+            return {
+                fields: scDone ? [
+                    { type: 'select', id: 'assessReportStatus', label: 'SolArch Assessment Report Status *', options: [
+                        { value: 'In-Progress', label: 'In-Progress' },
+                        { value: 'Completed', label: 'Completed (Uploaded to SharePoint)' }
+                    ]}
+                ] : [],
+                message: scDone ? undefined : 'Strategic Classification must be completed before the Solutions Architecture Assessment Report can be submitted. Please complete the <strong>Strategic Classification</strong> step first.',
+                actions: scDone ? [
+                    { label: 'Submit Assessment', action: 'assess', arg: null, style: 'primary', confirm: false }
+                ] : []
+            };
+        }
     },
     Assessed: {
         allowedRoles: ['ICT SteerCo Secretariat', 'Solutions Architect'],
@@ -137,7 +141,8 @@ const WORKFLOW_STATES = {
         allowedRoles: ['ICT SteerCo Secretariat'],
         render: (init) => {
             let valueBadge = '', easeBadge = '';
-            if (init.steerco_scoring) {
+            const scored = !!init.steerco_scoring;
+            if (scored) {
                 const v = init.steerco_scoring.value;
                 const e = init.steerco_scoring.ease;
                 const vColor = v >= THRESHOLDS.steercoValue.high.min ? 'var(--success)' : 
@@ -152,17 +157,18 @@ const WORKFLOW_STATES = {
             }
             return {
                 badges: [valueBadge, easeBadge],
-                fields: [
+                fields: scored ? [
                     { type: 'select', id: 'steercoDecision', label: 'SteerCo Final Decision *', options: [
                         { value: 'Approved', label: 'Approved as Project' },
                         { value: 'Declined', label: 'Declined', confirm: true },
                         { value: 'Referred Back', label: 'Referred Back to Owner' }
                     ]},
                     { type: 'textarea', id: 'approveComments', label: 'Approval Comments', placeholder: 'Enter any remarks...' }
-                ],
-                actions: [
+                ] : [],
+                message: scored ? undefined : 'SteerCo Scoring must be completed before a decision can be submitted. Please complete the <strong>SteerCo Scoring</strong> step first.',
+                actions: scored ? [
                     { label: 'Submit Decision', action: 'approve', arg: null, style: 'primary', confirm: false }
-                ]
+                ] : []
             };
         }
     }

@@ -46,46 +46,8 @@ class DbService {
         }
         if (!fs.existsSync(DB_FILE)) {
             const initialData = {
-                initiatives: [
-                    {
-                        id: "init-1",
-                        request_number: "IDM-2026-0001",
-                        name: "NextGen Digital Learning Portal Transformation",
-                        request_date: new Date().toISOString(),
-                        requester_email: "jane.doe@unisa.ac.za",
-                        requester_name: "Jane Doe",
-                        requester_unit: "Academic Affairs",
-                        owner_email: "vusi.executive@unisa.ac.za",
-                        owner_name: "Vusi Executive",
-                        owner_unit: "Deputy Registrar Portfolio",
-                        background: "The existing academic LMS and registration systems are slow, frustrating students and leading to high dropouts.",
-                        objective: "Deploy a modern single-page Next.js portal integrating course schedules and strategic academic modules.",
-                        potential_benefits: "40% reduction in enrollment support times, cleaner registration cycles.",
-                        alignment_strategy: "Pillar 1: Advance Technology Mediated, Quality Learning and Teaching",
-                        capability_type: "Learning & Teaching",
-                        capability_group: "Student Admission",
-                        capability_title: "Study Application Management",
-                        impact_description: "System will replace primary legacy portals for student-facing web platforms.",
-                        budget_estimate: 850000.00,
-                        affected_parties: "All academic departments, registry teams, and 200,000+ students.",
-                        time_estimate: "12 Months",
-                        status: "Submitted",
-                        business_case_status: "In-Progress",
-                        solarch_report_status: "In-Progress"
-                    }
-                ],
-                history: [
-                    {
-                        history_id: "hist-1",
-                        initiative_id: "init-1",
-                        from_status: "Draft",
-                        to_status: "Submitted",
-                        updated_by_email: "jane.doe@unisa.ac.za",
-                        updated_by_name: "Jane Doe",
-                        updated_at: new Date().toISOString(),
-                        comments: "Initial draft submitted with strategy alignment and capability mappings."
-                    }
-                ]
+                initiatives: [],
+                history: []
             };
             fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), 'utf8');
         }

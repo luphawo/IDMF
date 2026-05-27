@@ -4,6 +4,7 @@
     --bg-secondary: rgba(255, 255, 255, 0.8);
     --bg-card: rgba(255, 255, 255, 0.9);
     --accent: #2563eb;
+    --primary: var(--accent);
     --accent-hover: #1d4ed8;
     --accent-glow: rgba(37, 99, 235, 0.2);
     --success: #10b981;

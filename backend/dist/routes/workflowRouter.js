@@ -295,6 +295,9 @@ router.post('/:id/assess', (req, res) => {
             return res.status(404).json({ success: false, message: "Initiative not found" });
         }
         const originalStatus = initiative.status;
+        if (!initiative.strategic_classification) {
+            return res.status(400).json({ success: false, message: "Strategic Classification must be completed before the assessment report can be submitted." });
+        }
         const nextStatus = solarch_report_status === 'Completed' ? 'Assessed' : originalStatus;
         const updated = dbService_1.DbService.updateInitiative(id, {
             solarch_report_status,
@@ -525,6 +528,9 @@ router.post('/:id/approve', (req, res) => {
         }
         const originalStatus = initiative.status;
         const sc = initiative.steerco_scoring;
+        if (approval_action === 'Approved' && !sc) {
+            return res.status(400).json({ success: false, message: "SteerCo Scoring must be completed before approval." });
+        }
         const updated = dbService_1.DbService.updateInitiative(id, {
             status: approval_action,
             steerco_meeting_date: steerco_meeting_date || new Date().toISOString(),

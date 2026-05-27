@@ -7,9 +7,42 @@ Switch to Sello Demand (Planner) to assign the accepted request to a solutions a
 Watch your terminal/command-line task console dynamically print out simulated Microsoft Teams Adaptive Cards and Power Automate webhook payloads with every action!
 
 
+test all the changes made and indicate any errors found
 
+
+Review the 2 excel files in the project folder so that you can update the Steering Committee's Action Workstation as follows:
+
+1. Show the Strategic Classification as previously generated in the Strategic Classification Scoring (If Minor, 1; Medium, 5; and High, 10.)
+
+2. Display Type of ICT Demand (If Tactical Demand, 1; Operational Demand, 5; and Strategic Demand, 10.)
+
+3. Display Effort (If greater than 6 months, 1; greater than 2 months and less or equal to 6 months, 5; and less or equal to 2 months, 10.)
+
+4. Display System Readiness (If Major custom dev required, 1; Minor custom dev required, 5; and Off-The-Shelf systems exist, 10.)
+
+5. Display Cost (If greater than R5m, 1; greater than R1m and less or equal to R5m, 5; and less or equal to R1m, 10.)
+
+6. Display Likelihood of Success (If Even chance, 1; Good chance, 5; and Great chance, 10.)
+
+7. Display Resources (If greater than 10, 1; greater than 6 and less or equal to 10, 5; and less or equal to 6, 10.)
+
+8. Calculate and display Value = (Strategic Classification + Type of ICT Demand)
+9. Calculate and display Ease = (Effort (Time) + System Readiness + Cost + Likelihood of Success + Resources)
+
+10. Display SteerCo Final Decision (Choice)
 
 Ask questions until you 95% confident that you understand the task. 
 
 
-test all the changes made and indicate any errors found
+
+update the dropdown options for Likelihood of Success to:
+Even odds (1);
+Good odds (5); and
+Great odds (10)
+
+
+update the dropdown options for Resources to:
+> 10 (1);
+> 6 and ≤ 10 (5); and
+≤ 6 (10)
+
