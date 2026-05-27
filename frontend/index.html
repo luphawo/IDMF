@@ -9,11 +9,12 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
 
     <!-- SIDEBAR NAVIGATION -->
-    <aside>
+    <aside role="complementary" aria-label="Navigation sidebar">
         <div class="logo-container">
-            <div class="logo-icon">
+            <div class="logo-icon" aria-hidden="true">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
                 </svg>
@@ -24,37 +25,40 @@
             </div>
         </div>
 
-        <ul class="nav-links">
-            <li class="nav-item active" onclick="switchView('overview')">
-                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        <nav aria-label="Main navigation">
+            <ul class="nav-links" role="menubar">
+            <li role="none">
+                    <button class="nav-item active" role="menuitem" onclick="switchView('overview')" aria-current="page">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
                 Overview Dashboard
             </li>
             <li class="nav-item" onclick="switchView('initiatives-list')">
-                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
                 Initiatives Registry
             </li>
             <li class="nav-item" onclick="switchView('intake-form')">
-                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 Register Initiative
             </li>
             <li class="nav-item" onclick="switchView('strategic-classification')">
-                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
                 Strategic Classification
             </li>
             <li class="nav-item" onclick="switchView('steerco-scoring')">
-                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 SteerCo Scoring
             </li>
             <li class="nav-item" onclick="switchView('reporting')">
-                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                 Executive Reports
             </li>
         </ul>
+        </nav>
 
         <!-- IDENTITY SWITCH PANEL -->
         <div class="identity-switch">
             <h3>🔑 Switch Active Persona</h3>
-            <select class="identity-select" id="personaSelect" onchange="changePersona()">
+            <select class="identity-select" id="personaSelect" onchange="changePersona()" aria-label="Select user persona">
                 <option value="requester" data-name="Jane Doe" data-email="jane.doe@unisa.ac.za" data-unit="Academic Affairs" data-role="Initiative Requester">Jane Doe (Requester)</option>
                 <option value="owner" data-name="Vusi Executive" data-email="vusi.executive@unisa.ac.za" data-unit="Deputy Registrar Portfolio" data-role="Initiative Owner">Vusi Executive (Owner)</option>
                 <option value="planner" data-name="Sello Demand" data-email="sello.planner@unisa.ac.za" data-unit="ICT PMO" data-role="Demand Planner">Sello Demand (Planner)</option>
@@ -65,36 +69,36 @@
     </aside>
 
     <!-- MAIN PORTAL BODY -->
-    <main>
+    <main id="main-content">
         <header>
             <div class="welcome-section">
                 <h2 id="headerTitle">Overview Governance Dashboard</h2>
                 <p id="headerSubtitle">Real-time status tracking for UNISA Strategic Initiatives</p>
             </div>
             <button class="action-btn" onclick="switchView('intake-form')">
-                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16m8-8H4"/></svg>
                 Register Initiative
             </button>
         </header>
 
         <!-- ==================== VIEW: OVERVIEW ==================== -->
-        <section id="view-overview" class="view-section active">
-            <div class="stats-grid">
+        <section id="view-overview" class="view-section active" aria-label="Overview Dashboard">
+            <div class="stats-grid" role="region" aria-label="Key statistics">
                 <div class="stat-card">
                     <span class="stat-title">Registered Initiatives</span>
-                    <span class="stat-val" id="statTotal">0</span>
+                    <span class="stat-val" id="statTotal" aria-live="polite">0</span>
                 </div>
                 <div class="stat-card warning">
                     <span class="stat-title">Pending Governance Actions</span>
-                    <span class="stat-val" id="statPending">0</span>
+                    <span class="stat-val" id="statPending" aria-live="polite">0</span>
                 </div>
                 <div class="stat-card success">
                     <span class="stat-title">Approved Projects</span>
-                    <span class="stat-val" id="statApproved">0</span>
+                    <span class="stat-val" id="statApproved" aria-live="polite">0</span>
                 </div>
                 <div class="stat-card danger">
                     <span class="stat-title">Declined/Parked</span>
-                    <span class="stat-val" id="statDeclined">0</span>
+                    <span class="stat-val" id="statDeclined" aria-live="polite">0</span>
                 </div>
             </div>
 
@@ -103,54 +107,54 @@
                 <p style="font-size: 0.85rem; color: var(--text-secondary);">Initiatives awaiting decision/inputs under your currently active persona role.</p>
             </div>
             
-            <div class="card-list" id="actionInboxList">
+            <div class="card-list" id="actionInboxList" role="list" aria-label="Action inbox">
                 <!-- Actions rendered dynamically by app.js -->
             </div>
         </section>
 
         <!-- ==================== VIEW: INITIATIVES LIST ==================== -->
-        <section id="view-initiatives-list" class="view-section">
-            <div class="card-list" id="fullInitiativesList">
+        <section id="view-initiatives-list" class="view-section" aria-label="Initiatives Registry">
+            <div class="card-list" id="fullInitiativesList" role="list" aria-label="All initiatives">
                 <!-- Full list rendered dynamically -->
             </div>
         </section>
 
         <!-- ==================== VIEW: INTAKE FORM ==================== -->
-        <section id="view-intake-form" class="view-section">
+        <section id="view-intake-form" class="view-section" aria-label="Register New Initiative">
             <div class="form-card">
                 <div style="margin-bottom: 30px;">
                     <h3>Register New Governance Initiative Request</h3>
                     <p style="font-size: 0.85rem; color: var(--text-secondary);">Please complete all strategic alignment metadata. Mandatory fields apply (UNISA Rule UC1).</p>
                 </div>
-                <form id="intakeForm" onsubmit="submitIntakeForm(event)">
+                <form id="intakeForm" onsubmit="submitIntakeForm(event)" novalidate>
                     <div class="form-grid">
                         <div class="form-group full-width">
                             <label>Initiative Name / Title *</label>
-                            <input type="text" class="form-input" id="formName" required placeholder="e.g. Integrated Academic Enrollment Digitization Project">
+                            <input type="text" class="form-input" id="formName" name="formName" required placeholder="e.g. Integrated Academic Enrollment Digitization Project" maxlength="200" aria-required="true">
                         </div>
                         <div class="form-group">
                             <label>Nominated Executive Owner Name *</label>
-                            <input type="text" class="form-input" id="formOwnerName" required placeholder="e.g. Vusi Executive">
+                            <input type="text" class="form-input" id="formOwnerName" name="formOwnerName" required placeholder="e.g. Vusi Executive" maxlength="100" aria-required="true">
                         </div>
                         <div class="form-group">
                             <label>Nominated Owner UNISA Email *</label>
-                            <input type="email" class="form-input" id="formOwnerEmail" required placeholder="e.g. vusi.executive@unisa.ac.za">
+                            <input type="email" class="form-input" id="formOwnerEmail" name="formOwnerEmail" required placeholder="e.g. vusi.executive@unisa.ac.za" maxlength="100" aria-required="true">
                         </div>
                         <div class="form-group full-width">
                             <label>Initiative Background (Reason for Change) *</label>
-                            <textarea class="form-input" id="formBackground" required placeholder="Outline why this change is necessary and current operational bottlenecks..."></textarea>
+                            <textarea class="form-input" id="formBackground" name="formBackground" required placeholder="Outline why this change is necessary and current operational bottlenecks..." maxlength="5000" aria-required="true"></textarea>
                         </div>
                         <div class="form-group full-width">
                             <label>Initiative Objective *</label>
-                            <textarea class="form-input" id="formObjective" required placeholder="Define the primary operational goals of this initiative..."></textarea>
+                            <textarea class="form-input" id="formObjective" name="formObjective" required placeholder="Define the primary operational goals of this initiative..." maxlength="5000" aria-required="true"></textarea>
                         </div>
                         <div class="form-group full-width">
                             <label>Potential Initiative Benefits (Measurable, Tangible and Intangible) *</label>
-                            <textarea class="form-input" id="formBenefits" required placeholder="Describe what institutional value and capacity benefits this delivers..."></textarea>
+                            <textarea class="form-input" id="formBenefits" name="formBenefits" required placeholder="Describe what institutional value and capacity benefits this delivers..." maxlength="5000" aria-required="true"></textarea>
                         </div>
                         <div class="form-group">
                             <label>Strategic Alignment Pillar/Enabler *</label>
-                            <select class="form-input" id="formStrategy" required>
+                            <select class="form-input" id="formStrategy" name="formStrategy" required aria-required="true">
                                 <option value="">-- Select Pillar/Enabler --</option>
                                 <option value="Pillar 1: Advance Technology Mediated, Quality Learning and Teaching">Pillar 1: Advance Technology Mediated, Quality Learning and Teaching</option>
                                 <option value="Pillar 2: Propel Research Innovation">Pillar 2: Propel Research Innovation</option>
@@ -168,7 +172,7 @@
                         <!-- CASCADING CAPABILITY CLUSTERS -->
                         <div class="form-group">
                             <label>Capability Type *</label>
-                            <select class="form-input" id="formCapType" required onchange="populateCapGroups()">
+                            <select class="form-input" id="formCapType" name="formCapType" required onchange="populateCapGroups()" aria-required="true">
                                 <option value="">-- Select Capability Type --</option>
                                 <option value="Learning & Teaching">Learning & Teaching</option>
                                 <option value="Research">Research</option>
@@ -177,32 +181,32 @@
                         </div>
                         <div class="form-group">
                             <label>Capability Group *</label>
-                            <select class="form-input" id="formCapGroup" required onchange="populateCapTitles()">
+                            <select class="form-input" id="formCapGroup" name="formCapGroup" required onchange="populateCapTitles()" aria-required="true">
                                 <option value="">-- Select Group --</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label>Capability Title *</label>
-                            <select class="form-input" id="formCapTitle" required>
+                            <select class="form-input" id="formCapTitle" name="formCapTitle" required aria-required="true">
                                 <option value="">-- Select Title --</option>
                             </select>
                         </div>
 
                         <div class="form-group full-width">
                             <label>High Level Impact Analysis (Operational/Architecture impact) *</label>
-                            <textarea class="form-input" id="formImpact" required placeholder="Describe systems, integrations, or organizational models impacted by this change..."></textarea>
+                            <textarea class="form-input" id="formImpact" name="formImpact" required placeholder="Describe systems, integrations, or organizational models impacted by this change..." maxlength="5000" aria-required="true"></textarea>
                         </div>
                         <div class="form-group">
                             <label>Budget Estimate (Rand R) *</label>
-                            <input type="number" class="form-input" id="formBudget" required placeholder="e.g. 500000">
+                            <input type="number" class="form-input" id="formBudget" name="formBudget" required placeholder="e.g. 500000" min="0" step="0.01" aria-required="true">
                         </div>
                         <div class="form-group">
                             <label>Project Time Estimate *</label>
-                            <input type="text" class="form-input" id="formTime" required placeholder="e.g. 6 Months, 12 Months">
+                            <input type="text" class="form-input" id="formTime" name="formTime" required placeholder="e.g. 6 Months, 12 Months" maxlength="50" aria-required="true">
                         </div>
                         <div class="form-group full-width">
                             <label>Affected Parties / Stakeholders *</label>
-                            <input type="text" class="form-input" id="formAffected" required placeholder="e.g. All Registration Staff, ICT division, finance branch">
+                            <input type="text" class="form-input" id="formAffected" name="formAffected" required placeholder="e.g. All Registration Staff, ICT division, finance branch" maxlength="500" aria-required="true">
                         </div>
                     </div>
                     <div class="form-actions">
@@ -214,7 +218,7 @@
         </section>
 
         <!-- ==================== VIEW: INITIATIVE DETAIL ==================== -->
-        <section id="view-initiative-detail" class="view-section">
+        <section id="view-initiative-detail" class="view-section" aria-label="Initiative Detail">
             <div class="detail-grid">
                 <div class="detail-main">
                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 20px;">
@@ -252,6 +256,7 @@
                             <div id="solarchReportLink" style="padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; font-size: 0.85rem;"></div>
                             <div id="strategicClassLink" style="display:none; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; font-size: 0.85rem;"></div>
                             <div id="steercoScoringLink" style="display:none; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; font-size: 0.85rem;"></div>
+                            <div id="steercoPackLink" style="display:none; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; font-size: 0.85rem;"></div>
                         </div>
                     </div>
                 </div>
@@ -269,7 +274,7 @@
                     <!-- WORKFLOW HISTORY LOGS FOR AUDITABILITY -->
                     <div class="timeline-card">
                         <h3>📜 Workflow History Trace</h3>
-                        <div class="timeline" id="detailHistoryTimeline" style="margin-top: 20px;">
+                        <div class="timeline" id="detailHistoryTimeline" style="margin-top: 20px;" role="list" aria-label="Workflow history">
                             <!-- Dynamically loaded -->
                         </div>
                     </div>
@@ -278,39 +283,39 @@
         </section>
 
         <!-- ==================== VIEW: STRATEGIC CLASSIFICATION ==================== -->
-        <section id="view-strategic-classification" class="view-section">
+        <section id="view-strategic-classification" class="view-section" aria-label="Strategic Classification">
             <div class="welcome-section" style="margin-bottom: 24px;">
                 <h2>Strategic Classification Scoring</h2>
                 <p style="color: var(--text-secondary); font-size: 0.95rem;">Score initiatives against UNISA's Strategic Pillars and Enablers. Select an initiative to begin the classification matrix.</p>
             </div>
-            <div id="strategicClassifictionInitiativesList" class="card-list" style="margin-bottom: 24px;">
+            <div id="strategicClassifictionInitiativesList" class="card-list" style="margin-bottom: 24px;" role="list" aria-label="Initiatives for classification">
                 <!-- Initiative list rendered dynamically -->
             </div>
-            <div id="strategicClassificationMatrix" class="form-card" style="display:none;">
+            <div id="strategicClassificationMatrix" class="form-card" style="display:none;" role="region" aria-label="Classification matrix">
                 <!-- Scoring matrix rendered dynamically -->
             </div>
         </section>
 
         <!-- ==================== VIEW: STEERCO SCORING ==================== -->
-        <section id="view-steerco-scoring" class="view-section">
+        <section id="view-steerco-scoring" class="view-section" aria-label="SteerCo Scoring">
             <div class="welcome-section" style="margin-bottom: 24px;">
                 <h2>SteerCo Value & Ease Scoring</h2>
                 <p style="color: var(--text-secondary); font-size: 0.95rem;">Score initiatives on Value (Strategic Classification + Type of ICT Demand) and Ease (Effort + Readiness + Cost + Success + Resources). Select an initiative to begin.</p>
             </div>
-            <div id="steercoScoringInitiativesList" class="card-list" style="margin-bottom: 24px;">
+            <div id="steercoScoringInitiativesList" class="card-list" style="margin-bottom: 24px;" role="list" aria-label="Initiatives for SteerCo scoring">
                 <!-- Initiative list rendered dynamically -->
             </div>
-            <div id="steercoScoringMatrix" class="form-card" style="display:none;">
+            <div id="steercoScoringMatrix" class="form-card" style="display:none;" role="region" aria-label="SteerCo scoring matrix">
                 <!-- Scoring matrix rendered dynamically -->
             </div>
         </section>
 
         <!-- ==================== VIEW: REPORTING ==================== -->
-        <section id="view-reporting" class="view-section">
-            <div class="stats-grid">
+        <section id="view-reporting" class="view-section" aria-label="Executive Reports">
+            <div class="stats-grid" role="region" aria-label="Report statistics">
                 <div class="stat-card success">
                     <span class="stat-title">Institutional Pipeline Value</span>
-                    <span class="stat-val" id="reportValue">R 0</span>
+                    <span class="stat-val" id="reportValue" aria-live="polite">R 0</span>
                 </div>
                 <div class="stat-card">
                     <span class="stat-title">SLA Compliance Target</span>
@@ -330,15 +335,15 @@
                 <h3>Executive Portfolio Governance Report</h3>
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 24px;">Generated on demand. Deeply integrated with Microsoft Power BI feeds.</p>
                 <div style="overflow-x: auto;">
-                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;" id="reportTable">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;" id="reportTable" role="table" aria-label="Executive portfolio report">
                         <thead>
                             <tr style="border-bottom: 2px solid var(--border); padding-bottom: 12px; color: var(--text-secondary);">
-                                <th style="padding: 12px;">Request No</th>
-                                <th style="padding: 12px;">Initiative Name</th>
-                                <th style="padding: 12px;">Requester</th>
-                                <th style="padding: 12px;">Strategy Pillar</th>
-                                <th style="padding: 12px;">Status</th>
-                                <th style="padding: 12px;">Estimated Budget</th>
+                                <th style="padding: 12px;" scope="col">Request No</th>
+                                <th style="padding: 12px;" scope="col">Initiative Name</th>
+                                <th style="padding: 12px;" scope="col">Requester</th>
+                                <th style="padding: 12px;" scope="col">Strategy Pillar</th>
+                                <th style="padding: 12px;" scope="col">Status</th>
+                                <th style="padding: 12px;" scope="col">Estimated Budget</th>
                             </tr>
                         </thead>
                         <tbody>

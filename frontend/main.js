@@ -1,38 +1,174 @@
-const API_BASE = 'http://localhost:3005/api';
+// ============================================================
+// IDMF - Integrated Demand Management Framework
+// Version: 2.0.0 (Security Hardened & Refactored)
+// ============================================================
 
-// Current active persona details (Mock SSO Simulation)
-let currentPersona = {
-    key: 'requester',
-    name: 'Jane Doe',
-    email: 'jane.doe@unisa.ac.za',
-    unit: 'Academic Affairs',
-    role: 'Initiative Requester'
+const API_BASE = window.IDM_CONFIG?.API_BASE || 'http://localhost:3005/api';
+
+// ============================================================
+// CONFIGURATION & CONSTANTS (Single Source of Truth)
+// ============================================================
+
+const STRATEGIC_FRAMEWORK = {
+    pillars: [
+        { name: "Pillar 1: Advance Technology Mediated, Quality Learning and Teaching", weight: 17 },
+        { name: "Pillar 2: Propel Research Innovation", weight: 15 },
+        { name: "Pillar 3: Pivot Engaged Scholarship and Global Impact", weight: 13 },
+        { name: "Pillar 4: Strengthen Student Support Services", weight: 11 },
+        { name: "Pillar 5: Resourcing our Futures", weight: 9 },
+        { name: "Enabler 1: People", weight: 7 },
+        { name: "Enabler 2: Digitalization and Digitization", weight: 7 },
+        { name: "Enabler 3: Governance, Reporting and Management Systems", weight: 7 },
+        { name: "Enabler 4: Financial Sustainability", weight: 7 },
+        { name: "Enabler 5: Infrastructure and Operations", weight: 7 }
+    ]
 };
 
-// In-Memory fallback cache in case backend is offline
-let activeInitiatives = [];
-let selectedInitiativeId = null;
+const THRESHOLDS = {
+    strategicClassification: {
+        minor: { max: 25 },
+        medium: { min: 25, max: 75 },
+        high: { min: 75 }
+    },
+    steercoValue: {
+        high: { min: 15 },
+        medium: { min: 10, max: 15 },
+        low: { max: 10 }
+    },
+    steercoEase: {
+        high: { min: 30 },
+        medium: { min: 20, max: 30 },
+        low: { max: 20 }
+    }
+};
 
-// Styled toast notification (replaces native alert)
-function showToast(message) {
-    const existing = document.querySelector('.toast-overlay');
-    if (existing) existing.remove();
+const WORKFLOW_STATES = {
+    Parked: {
+        allowedRoles: ['Demand Planner'],
+        render: (init, persona) => ({
+            message: `This initiative is <strong>Parked</strong>. You can unpark it to return to Accepted state.`,
+            fields: [
+                { type: 'textarea', id: 'unparkComments', label: 'Unpark Comments', placeholder: 'Reason for unparking...' }
+            ],
+            actions: [
+                { label: 'Unpark Initiative', action: 'unpark', arg: null, style: 'success' }
+            ]
+        })
+    },
+    Submitted: {
+        allowedRoles: ['Initiative Owner'],
+        condition: (init, persona) => init.owner_email === persona.email,
+        render: () => ({
+            fields: [
+                { type: 'textarea', id: 'ownerComments', label: 'Acceptance Comments / Remarks', placeholder: 'Enter comments here...' }
+            ],
+            actions: [
+                { label: 'Accept Request', action: 'accept', arg: 'Accept', style: 'success', confirm: false },
+                { label: 'Decline', action: 'accept', arg: 'Decline', style: 'danger', confirm: true }
+            ]
+        })
+    },
+    Accepted: {
+        allowedRoles: ['Demand Planner'],
+        render: () => ({
+            fields: [
+                { type: 'select', id: 'assignReviewer', label: 'Assign Governance Reviewer *', options: [
+                    { value: 'dev.arch@unisa.ac.za|Dev Solutions', label: 'Dev Solutions (Enterprise Architecture)' },
+                    { value: 'jane.doe@unisa.ac.za|Jane Doe', label: 'Jane Doe (Academic Affairs)' }
+                ]}
+            ],
+            actions: [
+                { label: 'Assign & Set Reviewed', action: 'assign', arg: 'Assign', style: 'primary', confirm: false },
+                { label: 'Park Initiative', action: 'assign', arg: 'Park', style: 'warning', confirm: true }
+            ]
+        })
+    },
+    Reviewed: {
+        allowedRoles: ['Solutions Architect', 'Demand Planner'],
+        render: (init) => {
+            const sc = init.strategic_classification;
+            const derivedImpact = !sc ? 'Not yet classified' :
+                sc.total_weighted_score < THRESHOLDS.strategicClassification.minor.max ? 'Minor' :
+                sc.total_weighted_score >= THRESHOLDS.strategicClassification.high.min ? 'High' : 'Medium';
+            return {
+                fields: [
+                    { type: 'text', id: 'reviewImpact', label: 'Derived Strategic Impact (from Classification)', value: derivedImpact, readonly: true },
+                    { type: 'select', id: 'reviewBcStatus', label: 'Business Case Document Status *', options: [
+                        { value: 'In-Progress', label: 'In-Progress (Draft)' },
+                        { value: 'Signed-Fully', label: 'Signed-Fully (Uploaded to SharePoint)' }
+                    ]}
+                ],
+                actions: [
+                    { label: 'Submit Review', action: 'review', arg: null, style: 'primary', confirm: false }
+                ]
+            };
+        }
+    },
+    SolArch: {
+        allowedRoles: ['Solutions Architect'],
+        render: () => ({
+            fields: [
+                { type: 'select', id: 'assessReportStatus', label: 'SolArch Assessment Report Status *', options: [
+                    { value: 'In-Progress', label: 'In-Progress' },
+                    { value: 'Completed', label: 'Completed (Uploaded to SharePoint)' }
+                ]}
+            ],
+            actions: [
+                { label: 'Submit Assessment', action: 'assess', arg: null, style: 'primary', confirm: false }
+            ]
+        })
+    },
+    Assessed: {
+        allowedRoles: ['ICT SteerCo Secretariat', 'Solutions Architect'],
+        render: () => ({
+            fields: [
+                { type: 'select', id: 'recommendDecision', label: 'Committee Meeting Recommendation *', options: [
+                    { value: 'Recommended', label: 'Recommended (To ICT SteerCo)' },
+                    { value: 'Declined', label: 'Declined', confirm: true },
+                    { value: 'Referred Back', label: 'Referred Back to Owner' }
+                ]}
+            ],
+            actions: [
+                { label: 'Record Recommendation', action: 'recommend', arg: null, style: 'primary', confirm: false }
+            ]
+        })
+    },
+    Recommended: {
+        allowedRoles: ['ICT SteerCo Secretariat'],
+        render: (init) => {
+            let valueBadge = '', easeBadge = '';
+            if (init.steerco_scoring) {
+                const v = init.steerco_scoring.value;
+                const e = init.steerco_scoring.ease;
+                const vColor = v >= THRESHOLDS.steercoValue.high.min ? 'var(--success)' : 
+                               v >= THRESHOLDS.steercoValue.medium.min ? 'var(--warning)' : 'var(--danger)';
+                const eColor = e >= THRESHOLDS.steercoEase.high.min ? 'var(--success)' : 
+                               e >= THRESHOLDS.steercoEase.medium.min ? 'var(--warning)' : 'var(--danger)';
+                valueBadge = `<span style="display:inline-block;padding:4px 12px;border-radius:20px;background:${vColor}20;color:${vColor};font-weight:600;font-size:0.85rem;">Value: ${formatNumber(v)}</span>`;
+                easeBadge = `<span style="display:inline-block;padding:4px 12px;border-radius:20px;background:${eColor}20;color:${eColor};font-weight:600;font-size:0.85rem;">Ease: ${formatNumber(e)}</span>`;
+            } else {
+                valueBadge = `<span style="color:var(--text-secondary);font-size:0.85rem;">Value: Not scored yet</span>`;
+                easeBadge = `<span style="color:var(--text-secondary);font-size:0.85rem;">Ease: Not scored yet</span>`;
+            }
+            return {
+                badges: [valueBadge, easeBadge],
+                fields: [
+                    { type: 'select', id: 'steercoDecision', label: 'SteerCo Final Decision *', options: [
+                        { value: 'Approved', label: 'Approved as Project' },
+                        { value: 'Declined', label: 'Declined', confirm: true },
+                        { value: 'Referred Back', label: 'Referred Back to Owner' }
+                    ]},
+                    { type: 'textarea', id: 'approveComments', label: 'Approval Comments', placeholder: 'Enter any remarks...' }
+                ],
+                actions: [
+                    { label: 'Submit Decision', action: 'approve', arg: null, style: 'primary', confirm: false }
+                ]
+            };
+        }
+    }
+};
 
-    const overlay = document.createElement('div');
-    overlay.className = 'toast-overlay';
-    overlay.innerHTML = `
-        <div class="toast-box">
-            <div class="toast-icon">📋</div>
-            <p>${message}</p>
-            <button class="toast-btn" onclick="this.closest('.toast-overlay').remove()">OK</button>
-        </div>
-    `;
-    document.body.appendChild(overlay);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-}
-
-// Cascading Capability mapping dictionary (parsed from UNISA framework)
-const capabilityData = {
+const CAPABILITY_DATA = {
     "Learning & Teaching": {
         "Curriculum Management": ["Curriculum Planning", "Curriculum Design", "Curriculum Production", "Curriculum Accreditation", "Offering Management", "Curriculum Improvement", "Curriculum Disestablishment"],
         "Student Recruitment": ["Domestic Student Recruitment", "International Student Recruitment"],
@@ -70,188 +206,223 @@ const capabilityData = {
     }
 };
 
-// -------------------------------------------------------------
-// LIFE CYCLE INITIALIZER
-// -------------------------------------------------------------
-window.onload = function() {
-    changePersona();
-    populateCapTypes();
-    loadAllInitiatives();
+// ============================================================
+// STATE MANAGEMENT (Centralized Store)
+// ============================================================
+
+const Store = {
+    _state: {
+        persona: {
+            key: 'requester',
+            name: 'Jane Doe',
+            email: 'jane.doe@unisa.ac.za',
+            unit: 'Academic Affairs',
+            role: 'Initiative Requester'
+        },
+        initiatives: [],
+        selectedId: null,
+        pendingScores: new Map(),
+        pendingSteercoScores: new Map(),
+        lastRequestId: 0
+    },
+    _listeners: new Map(),
+
+    get(key) { return this._state[key]; },
+
+    set(key, value) {
+        const oldValue = this._state[key];
+        this._state[key] = value;
+        this._notify(key, value, oldValue);
+    },
+
+    update(key, updater) {
+        const current = this._state[key];
+        const updated = typeof updater === 'function' ? updater(current) : { ...current, ...updater };
+        this.set(key, updated);
+    },
+
+    subscribe(key, callback) {
+        if (!this._listeners.has(key)) this._listeners.set(key, new Set());
+        this._listeners.get(key).add(callback);
+        return () => this._listeners.get(key).delete(callback);
+    },
+
+    _notify(key, newValue, oldValue) {
+        this._listeners.get(key)?.forEach(cb => {
+            try { cb(newValue, oldValue); } catch (e) { console.error('Store listener error:', e); }
+        });
+    }
 };
 
-function switchView(viewId) {
-    document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+// ============================================================
+// SECURITY UTILITIES
+// ============================================================
 
-    const activeView = document.getElementById(`view-${viewId}`);
-    if (activeView) activeView.classList.add('active');
-
-    const items = document.querySelectorAll('.nav-item');
-    if (viewId === 'overview') items[0].classList.add('active');
-    else if (viewId === 'initiatives-list') items[1].classList.add('active');
-    else if (viewId === 'intake-form') items[2].classList.add('active');
-    else if (viewId === 'strategic-classification') items[3].classList.add('active');
-    else if (viewId === 'steerco-scoring') items[4].classList.add('active');
-    else if (viewId === 'reporting') items[5].classList.add('active');
-
-    if (viewId === 'reporting') {
-        renderReports();
-    }
-
-    if (viewId === 'strategic-classification') {
-        renderStrategicClassificationList();
-    }
-
-    if (viewId === 'steerco-scoring') {
-        renderSteercoScoringList();
-    }
+/**
+ * Escape HTML entities to prevent XSS attacks.
+ * @param {string} str - Raw user input
+ * @returns {string} Escaped string safe for HTML insertion
+ */
+function escapeHtml(str) {
+    if (str == null) return '';
+    const div = document.createElement('div');
+    div.textContent = String(str);
+    return div.innerHTML;
 }
 
-// -------------------------------------------------------------
-// IDENTITY SWITCH MANAGER (Mock SSO)
-// -------------------------------------------------------------
-function changePersona() {
-    const select = document.getElementById('personaSelect');
-    const option = select.options[select.selectedIndex];
+/**
+ * Validate and sanitize form inputs.
+ */
+const Validators = {
+    required(value, fieldName) {
+        if (!value || String(value).trim() === '') {
+            throw new ValidationError(`${fieldName} is required.`);
+        }
+        return String(value).trim();
+    },
 
-    currentPersona = {
-        key: select.value,
-        name: option.getAttribute('data-name'),
-        email: option.getAttribute('data-email'),
-        unit: option.getAttribute('data-unit'),
-        role: option.getAttribute('data-role')
-    };
+    email(value, fieldName = 'Email') {
+        const trimmed = this.required(value, fieldName);
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(trimmed)) {
+            throw new ValidationError(`${fieldName} must be a valid email address.`);
+        }
+        return trimmed;
+    },
 
-    console.log("SSO Persona switched to:", currentPersona);
+    positiveNumber(value, fieldName = 'Amount') {
+        const num = Number(value);
+        if (isNaN(num) || num < 0) {
+            throw new ValidationError(`${fieldName} must be a positive number.`);
+        }
+        if (num > 999999999999) {
+            throw new ValidationError(`${fieldName} exceeds maximum allowed value.`);
+        }
+        return num;
+    },
 
-    document.getElementById('headerSubtitle').innerText = `Logged in as: ${currentPersona.name} (${currentPersona.role}) | Unit: ${currentPersona.unit}`;
-
-    loadAllInitiatives();
-    if (selectedInitiativeId) {
-        viewInitiativeDetail(selectedInitiativeId);
+    maxLength(value, max, fieldName = 'Field') {
+        const str = String(value);
+        if (str.length > max) {
+            throw new ValidationError(`${fieldName} must not exceed ${max} characters.`);
+        }
+        return str;
     }
-}
+};
 
-// Helper to pass mock Entra ID headers with all REST requests
-function getAuthHeaders() {
-    return {
-        'Content-Type': 'application/json',
-        'x-role': currentPersona.role,
-        'x-email': currentPersona.email,
-        'x-name': currentPersona.name,
-        'x-unit': currentPersona.unit
-    };
-}
-
-// -------------------------------------------------------------
-// CASCADING CAPABILITY DROPDOWN SELECTORS
-// -------------------------------------------------------------
-function populateCapTypes() {
-    const typeSelect = document.getElementById('formCapType');
-    typeSelect.innerHTML = '<option value="">-- Select Capability Type --</option>';
-    Object.keys(capabilityData).forEach(type => {
-        typeSelect.innerHTML += `<option value="${type}">${type}</option>`;
-    });
-}
-
-function populateCapGroups() {
-    const type = document.getElementById('formCapType').value;
-    const groupSelect = document.getElementById('formCapGroup');
-    groupSelect.innerHTML = '<option value="">-- Select Group --</option>';
-
-    if (type && capabilityData[type]) {
-        Object.keys(capabilityData[type]).forEach(group => {
-            groupSelect.innerHTML += `<option value="${group}">${group}</option>`;
-        });
-    }
-    populateCapTitles();
-}
-
-function populateCapTitles() {
-    const type = document.getElementById('formCapType').value;
-    const group = document.getElementById('formCapGroup').value;
-    const titleSelect = document.getElementById('formCapTitle');
-    titleSelect.innerHTML = '<option value="">-- Select Title --</option>';
-
-    if (type && group && capabilityData[type][group]) {
-        capabilityData[type][group].forEach(title => {
-            titleSelect.innerHTML += `<option value="${title}">${title}</option>`;
-        });
+class ValidationError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = 'ValidationError';
     }
 }
 
-// -------------------------------------------------------------
-// BACKEND API COMMUNICATIONS & INBOX FILTER
-// -------------------------------------------------------------
-async function loadAllInitiatives() {
+// ============================================================
+// FORMATTING UTILITIES
+// ============================================================
+
+function formatCurrency(amount) {
+    if (amount == null) return 'R 0,00';
+    return new Intl.NumberFormat('en-ZA', {
+        style: 'currency',
+        currency: 'ZAR',
+        minimumFractionDigits: 2
+    }).format(amount);
+}
+
+function formatDate(isoString) {
+    if (!isoString) return 'N/A';
     try {
-        const response = await fetch(`${API_BASE}/initiatives`, { headers: getAuthHeaders() });
-        const resData = await response.json();
-
-        if (resData.success) {
-            activeInitiatives = resData.data;
-        }
-    } catch (e) {
-        console.warn("Backend API server is offline. Running with fallback local storage state simulation.");
-        if (activeInitiatives.length === 0) {
-            activeInitiatives = [
-                {
-                    id: "init-1",
-                    request_number: "IDM-2026-0001",
-                    name: "NextGen Digital Learning Portal Transformation",
-                    request_date: new Date().toISOString(),
-                    requester_email: "jane.doe@unisa.ac.za",
-                    requester_name: "Jane Doe",
-                    requester_unit: "Academic Affairs",
-                    owner_email: "vusi.executive@unisa.ac.za",
-                    owner_name: "Vusi Executive",
-                    owner_unit: "Deputy Registrar Portfolio",
-                    background: "The existing academic LMS and registration systems are slow, frustrating students and leading to high dropouts.",
-                    objective: "Deploy a modern single-page Next.js portal integrating course schedules.",
-                    potential_benefits: "40% reduction in enrollment support times.",
-                    alignment_strategy: "Pillar 1: Advance Technology Mediated, Quality Learning and Teaching",
-                    capability_type: "Learning & Teaching",
-                    capability_group: "Student Admission",
-                    capability_title: "Study Application Management",
-                    impact_description: "System replaces legacy student systems.",
-                    budget_estimate: 850000.00,
-                    affected_parties: "All academic departments.",
-                    time_estimate: "12 Months",
-                    status: "Submitted",
-                    business_case_status: "In-Progress",
-                    solarch_report_status: "In-Progress"
-                }
-            ];
-        }
+        return new Date(isoString).toLocaleDateString('en-ZA', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+        });
+    } catch {
+        return 'Invalid Date';
     }
-
-    renderOverviewStats();
-    renderInboxLists();
 }
 
-function renderOverviewStats() {
-    document.getElementById('statTotal').innerText = activeInitiatives.length;
-
-    const approved = activeInitiatives.filter(i => i.status === 'Approved').length;
-    const declined = activeInitiatives.filter(i => i.status === 'Declined' || i.status === 'Parked').length;
-
-    document.getElementById('statApproved').innerText = approved;
-    document.getElementById('statDeclined').innerText = declined;
-
-    const pendingActions = getActionsForRole().length;
-    document.getElementById('statPending').innerText = pendingActions;
+function formatDateTime(isoString) {
+    if (!isoString) return 'N/A';
+    try {
+        return new Date(isoString).toLocaleString('en-ZA', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch {
+        return 'Invalid Date';
+    }
 }
 
-// -------------------------------------------------------------
-// GOVERNANCE FILTER MATRIX (Action Items based on role and stage)
-// -------------------------------------------------------------
-function getActionsForRole() {
-    return activeInitiatives.filter(init => {
+function formatNumber(num) {
+    if (num == null) return '0.0';
+    return Number(num).toFixed(1);
+}
+
+// ============================================================
+// PURE BUSINESS LOGIC (Testable, No DOM)
+// ============================================================
+
+/**
+ * Calculate strategic classification from scores.
+ * @param {Object} scores - Map of pillar names to scores
+ * @returns {Object} Classification result
+ */
+function calculateStrategicClassification(scores) {
+    let total = 0;
+    const breakdown = STRATEGIC_FRAMEWORK.pillars.map(p => {
+        const score = scores[p.name] || 0;
+        const weighted = score * p.weight / 10;
+        total += weighted;
+        return { name: p.name, weight: p.weight, score, weighted };
+    });
+
+    const category = total < THRESHOLDS.strategicClassification.minor.max ? 'Minor' :
+                     total >= THRESHOLDS.strategicClassification.high.min ? 'High' : 'Medium';
+
+    return { total, category, breakdown };
+}
+
+/**
+ * Calculate SteerCo Value score.
+ */
+function calculateSteercoValue(scNumeric, ictDemand) {
+    return scNumeric + (ictDemand || 5);
+}
+
+/**
+ * Calculate SteerCo Ease score.
+ */
+function calculateSteercoEase(dimensions) {
+    const keys = ['effort', 'system_readiness', 'cost', 'likelihood_success', 'resources'];
+    return keys.reduce((sum, k) => sum + (dimensions?.[k] || 0), 0);
+}
+
+/**
+ * Derive strategic impact from classification score.
+ */
+function deriveStrategicImpact(classification) {
+    if (!classification) return 'Not yet classified';
+    const score = classification.total_weighted_score;
+    if (score < THRESHOLDS.strategicClassification.minor.max) return 'Minor';
+    if (score >= THRESHOLDS.strategicClassification.high.min) return 'High';
+    return 'Medium';
+}
+
+/**
+ * Determine available actions for a role.
+ */
+function getActionsForRole(initiatives, persona) {
+    return initiatives.filter(init => {
         if (init.status === 'Declined' || init.status === 'Approved') return false;
 
-        switch (currentPersona.role) {
+        switch (persona.role) {
             case 'Initiative Owner':
-                return init.status === 'Submitted' && init.owner_email === currentPersona.email;
+                return init.status === 'Submitted' && init.owner_email === persona.email;
             case 'Demand Planner':
                 return init.status === 'Accepted' || init.status === 'Parked';
             case 'Solutions Architect':
@@ -265,582 +436,932 @@ function getActionsForRole() {
     });
 }
 
-function renderInboxLists() {
-    const inbox = document.getElementById('actionInboxList');
-    inbox.innerHTML = '';
+// ============================================================
+// UI UTILITIES
+// ============================================================
 
-    const actions = getActionsForRole();
-    if (actions.length === 0) {
-        inbox.innerHTML = `
-            <div style="text-align: center; padding: 40px; color: var(--text-secondary); border: 1px dashed var(--border); border-radius: 12px;">
-                All caught up! No active initiatives require action under your "${currentPersona.role}" role.
-            </div>`;
-    } else {
-        actions.forEach(init => {
-            inbox.innerHTML += renderInitiativeCard(init);
-        });
-    }
+function showToast(message, type = 'info') {
+    const existing = document.querySelector('.toast-overlay');
+    if (existing) existing.remove();
 
-    const registry = document.getElementById('fullInitiativesList');
-    registry.innerHTML = '';
-    activeInitiatives.forEach(init => {
-        registry.innerHTML += renderInitiativeCard(init);
+    const icons = { info: '📋', success: '✅', warning: '⚠️', error: '❌' };
+
+    const overlay = document.createElement('div');
+    overlay.className = 'toast-overlay';
+    overlay.setAttribute('role', 'alert');
+    overlay.setAttribute('aria-live', 'polite');
+    overlay.innerHTML = `
+        <div class="toast-box">
+            <div class="toast-icon">${icons[type] || icons.info}</div>
+            <p>${escapeHtml(message)}</p>
+            <button class="toast-btn" onclick="this.closest('.toast-overlay').remove()">OK</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const timeout = setTimeout(() => overlay.remove(), 5000);
+    overlay.addEventListener('click', (e) => { 
+        if (e.target === overlay) {
+            clearTimeout(timeout);
+            overlay.remove(); 
+        }
+    });
+
+    const btn = overlay.querySelector('.toast-btn');
+    if (btn) btn.focus();
+}
+
+function showConfirmDialog(message) {
+    return new Promise((resolve) => {
+        const existing = document.querySelector('.confirm-overlay');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.className = 'confirm-overlay';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.innerHTML = `
+            <div class="confirm-box">
+                <div class="confirm-icon">⚠️</div>
+                <p>${escapeHtml(message)}</p>
+                <div class="confirm-actions">
+                    <button class="action-btn" style="background:rgba(255,255,255,0.05);color:var(--text-primary);" onclick="this.closest('.confirm-overlay').remove(); window._confirmResult = false;">Cancel</button>
+                    <button class="action-btn" style="background:var(--danger);" onclick="this.closest('.confirm-overlay').remove(); window._confirmResult = true;">Confirm</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        const checkInterval = setInterval(() => {
+            if (window._confirmResult !== undefined) {
+                clearInterval(checkInterval);
+                const result = window._confirmResult;
+                delete window._confirmResult;
+                resolve(result);
+            }
+        }, 100);
     });
 }
 
-function renderInitiativeCard(init) {
-    return `
-        <div class="initiative-item" onclick="viewInitiativeDetail('${init.id}')">
-            <div class="item-left">
-                <span class="badge ${init.status}">${init.status}</span>
-                <span class="item-title" style="margin-top: 6px;">${init.name}</span>
-                <div class="item-meta">
-                    <span>Requester: ${init.requester_name}</span>
-                    <span>Unit: ${init.requester_unit}</span>
-                    <span>Budget: R ${init.budget_estimate.toLocaleString()}</span>
-                </div>
-            </div>
-            <div>
-                <svg width="20" height="20" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
-            </div>
-        </div>
-    `;
+function setLoading(isLoading) {
+    document.body.classList.toggle('loading', isLoading);
 }
 
-// -------------------------------------------------------------
-// UC1: INTAKE SUBMISSION
-// -------------------------------------------------------------
-async function submitIntakeForm(event) {
-    event.preventDefault();
+function debounce(fn, ms) {
+    let timeout;
+    return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => fn(...args), ms);
+    };
+}
 
-    const name = document.getElementById('formName').value;
-    const owner_name = document.getElementById('formOwnerName').value;
-    const owner_email = document.getElementById('formOwnerEmail').value;
-    const background = document.getElementById('formBackground').value;
-    const objective = document.getElementById('formObjective').value;
-    const potential_benefits = document.getElementById('formBenefits').value;
-    const alignment_strategy = document.getElementById('formStrategy').value;
-    const capability_type = document.getElementById('formCapType').value;
-    const capability_group = document.getElementById('formCapGroup').value;
-    const capability_title = document.getElementById('formCapTitle').value;
-    const impact_description = document.getElementById('formImpact').value;
-    const budget_estimate = document.getElementById('formBudget').value;
-    const time_estimate = document.getElementById('formTime').value;
-    const affected_parties = document.getElementById('formAffected').value;
+// ============================================================
+// AUTHENTICATION (JWT-Based)
+// ============================================================
 
-    const payload = {
-        name, owner_name, owner_email, background, objective, potential_benefits,
-        alignment_strategy, capability_type, capability_group, capability_title,
-        impact_description, budget_estimate: Number(budget_estimate), time_estimate, affected_parties
+function getAuthHeaders() {
+    const token = sessionStorage.getItem('idm_token');
+    const headers = {
+        'Content-Type': 'application/json'
+    };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    const persona = Store.get('persona');
+    headers['x-role'] = persona.role;
+    headers['x-email'] = persona.email;
+    headers['x-name'] = persona.name;
+    headers['x-unit'] = persona.unit;
+    return headers;
+}
+
+// ============================================================
+// CASCADING CAPABILITY DROPDOWNS
+// ============================================================
+
+function populateCapTypes() {
+    const typeSelect = document.getElementById('formCapType');
+    if (!typeSelect) return;
+
+    const fragment = document.createDocumentFragment();
+    fragment.appendChild(new Option('-- Select Capability Type --', ''));
+    Object.keys(CAPABILITY_DATA).forEach(type => {
+        fragment.appendChild(new Option(type, type));
+    });
+    typeSelect.innerHTML = '';
+    typeSelect.appendChild(fragment);
+}
+
+function populateCapGroups() {
+    const type = document.getElementById('formCapType')?.value;
+    const groupSelect = document.getElementById('formCapGroup');
+    if (!groupSelect) return;
+
+    const fragment = document.createDocumentFragment();
+    fragment.appendChild(new Option('-- Select Group --', ''));
+
+    if (type && CAPABILITY_DATA[type]) {
+        Object.keys(CAPABILITY_DATA[type]).forEach(group => {
+            fragment.appendChild(new Option(group, group));
+        });
+    }
+    groupSelect.innerHTML = '';
+    groupSelect.appendChild(fragment);
+    populateCapTitles();
+}
+
+function populateCapTitles() {
+    const type = document.getElementById('formCapType')?.value;
+    const group = document.getElementById('formCapGroup')?.value;
+    const titleSelect = document.getElementById('formCapTitle');
+    if (!titleSelect) return;
+
+    const fragment = document.createDocumentFragment();
+    fragment.appendChild(new Option('-- Select Title --', ''));
+
+    if (type && group && CAPABILITY_DATA[type]?.[group]) {
+        CAPABILITY_DATA[type][group].forEach(title => {
+            fragment.appendChild(new Option(title, title));
+        });
+    }
+    titleSelect.innerHTML = '';
+    titleSelect.appendChild(fragment);
+}
+
+// ============================================================
+// VIEW MANAGEMENT
+// ============================================================
+
+const VIEW_MAP = {
+    'overview': 0,
+    'initiatives-list': 1,
+    'intake-form': 2,
+    'strategic-classification': 3,
+    'steerco-scoring': 4,
+    'reporting': 5
+};
+
+function switchView(viewId) {
+    document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+    const activeView = document.getElementById(`view-${viewId}`);
+    if (activeView) activeView.classList.add('active');
+
+    const navIndex = VIEW_MAP[viewId];
+    if (navIndex !== undefined) {
+        const navItems = document.querySelectorAll('.nav-item');
+        if (navItems[navIndex]) navItems[navIndex].classList.add('active');
+    }
+
+    const routeHandlers = {
+        'reporting': renderReports,
+        'strategic-classification': renderStrategicClassificationList,
+        'steerco-scoring': renderSteercoScoringList
     };
 
-    try {
-        const response = await fetch(`${API_BASE}/initiatives/register`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(payload)
-        });
-
-        const resData = await response.json();
-        showToast(resData.message);
-
-        if (resData.success) {
-            document.getElementById('intakeForm').reset();
-            loadAllInitiatives();
-            switchView('overview');
-        }
-    } catch (e) {
-        const request_number = `IDM-2026-${String(activeInitiatives.length + 1).padStart(4, '0')}`;
-        const newInit = {
-            id: 'init-' + Math.random().toString(36).substr(2, 9),
-            request_number,
-            name,
-            request_date: new Date().toISOString(),
-            requester_email: currentPersona.email,
-            requester_name: currentPersona.name,
-            requester_unit: currentPersona.unit,
-            owner_email,
-            owner_name,
-            owner_unit: 'Corporate Services',
-            background, objective, potential_benefits, alignment_strategy,
-            capability_type, capability_group, capability_title,
-            impact_description, budget_estimate: Number(budget_estimate), time_estimate, affected_parties,
-            status: 'Submitted',
-            business_case_status: 'In-Progress',
-            solarch_report_status: 'In-Progress'
-        };
-        activeInitiatives.push(newInit);
-        renderOverviewStats();
-        renderInboxLists();
-        showToast(`Offline Simulation: Registered Initiative with Number: ${request_number}`);
-        document.getElementById('intakeForm').reset();
-        switchView('overview');
+    if (routeHandlers[viewId]) {
+        routeHandlers[viewId]();
     }
 }
 
-// -------------------------------------------------------------
-// UC2 - UC7 DETAIL VIEW & GOVERNANCE TRANSITION ENGINE
-// -------------------------------------------------------------
+// ============================================================
+// PERSONA MANAGEMENT
+// ============================================================
+
+function changePersona() {
+    const select = document.getElementById('personaSelect');
+    if (!select) return;
+
+    const option = select.options[select.selectedIndex];
+    const persona = {
+        key: select.value,
+        name: option.getAttribute('data-name'),
+        email: option.getAttribute('data-email'),
+        unit: option.getAttribute('data-unit'),
+        role: option.getAttribute('data-role')
+    };
+
+    Store.set('persona', persona);
+    console.log("SSO Persona switched to:", persona);
+
+    const subtitle = document.getElementById('headerSubtitle');
+    if (subtitle) {
+        subtitle.innerText = `Logged in as: ${escapeHtml(persona.name)} (${escapeHtml(persona.role)}) | Unit: ${escapeHtml(persona.unit)}`;
+    }
+
+    loadAllInitiatives();
+    const selectedId = Store.get('selectedId');
+    if (selectedId) {
+        viewInitiativeDetail(selectedId);
+    }
+}
+
+// ============================================================
+// API COMMUNICATION
+// ============================================================
+
+async function apiRequest(endpoint, options = {}) {
+    const url = `${API_BASE}${endpoint}`;
+    const config = {
+        headers: getAuthHeaders(),
+        ...options
+    };
+
+    if (config.body && typeof config.body === 'object') {
+        config.body = JSON.stringify(config.body);
+    }
+
+    try {
+        const response = await fetch(url, config);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.warn(`API request failed: ${url}`, error);
+        throw error;
+    }
+}
+
+// ============================================================
+// INITIATIVE DATA MANAGEMENT
+// ============================================================
+
+async function loadAllInitiatives() {
+    setLoading(true);
+    try {
+        const resData = await apiRequest('/initiatives');
+        if (resData.success) {
+            Store.set('initiatives', resData.data);
+        }
+    } catch (e) {
+        console.warn("Backend API server is offline. Running with fallback local storage state simulation.");
+        const initiatives = Store.get('initiatives');
+        if (initiatives.length === 0) {
+            Store.set('initiatives', [createMockInitiative()]);
+        }
+    } finally {
+        setLoading(false);
+    }
+
+    renderOverviewStats();
+    renderInboxLists();
+}
+
+function createMockInitiative() {
+    return {
+        id: "init-1",
+        request_number: "IDM-2026-0001",
+        name: "NextGen Digital Learning Portal Transformation",
+        request_date: new Date().toISOString(),
+        requester_email: "jane.doe@unisa.ac.za",
+        requester_name: "Jane Doe",
+        requester_unit: "Academic Affairs",
+        owner_email: "vusi.executive@unisa.ac.za",
+        owner_name: "Vusi Executive",
+        owner_unit: "Deputy Registrar Portfolio",
+        background: "The existing academic LMS and registration systems are slow, frustrating students and leading to high dropouts.",
+        objective: "Deploy a modern single-page Next.js portal integrating course schedules.",
+        potential_benefits: "40% reduction in enrollment support times.",
+        alignment_strategy: "Pillar 1: Advance Technology Mediated, Quality Learning and Teaching",
+        capability_type: "Learning & Teaching",
+        capability_group: "Student Admission",
+        capability_title: "Study Application Management",
+        impact_description: "System replaces legacy student systems.",
+        budget_estimate: 850000.00,
+        affected_parties: "All academic departments.",
+        time_estimate: "12 Months",
+        status: "Submitted",
+        business_case_status: "In-Progress",
+        solarch_report_status: "In-Progress"
+    };
+}
+
+function renderOverviewStats() {
+    const initiatives = Store.get('initiatives');
+
+    const statTotal = document.getElementById('statTotal');
+    const statApproved = document.getElementById('statApproved');
+    const statDeclined = document.getElementById('statDeclined');
+    const statPending = document.getElementById('statPending');
+
+    if (statTotal) statTotal.innerText = initiatives.length;
+
+    const approved = initiatives.filter(i => i.status === 'Approved').length;
+    const declined = initiatives.filter(i => i.status === 'Declined' || i.status === 'Parked').length;
+
+    if (statApproved) statApproved.innerText = approved;
+    if (statDeclined) statDeclined.innerText = declined;
+
+    const pendingActions = getActionsForRole(initiatives, Store.get('persona')).length;
+    if (statPending) statPending.innerText = pendingActions;
+}
+
+// ============================================================
+// INBOX & LIST RENDERING
+// ============================================================
+
+function renderInboxLists() {
+    const inbox = document.getElementById('actionInboxList');
+    const registry = document.getElementById('fullInitiativesList');
+    const initiatives = Store.get('initiatives');
+    const persona = Store.get('persona');
+
+    if (inbox) {
+        const actions = getActionsForRole(initiatives, persona);
+        if (actions.length === 0) {
+            inbox.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--text-secondary); border: 1px dashed var(--border); border-radius: 12px;" role="status">
+                    All caught up! No active initiatives require action under your "${escapeHtml(persona.role)}" role.
+                </div>`;
+        } else {
+            inbox.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+            actions.forEach(init => {
+                fragment.appendChild(createInitiativeCard(init));
+            });
+            inbox.appendChild(fragment);
+        }
+    }
+
+    if (registry) {
+        registry.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+        initiatives.forEach(init => {
+            fragment.appendChild(createInitiativeCard(init));
+        });
+        registry.appendChild(fragment);
+    }
+}
+
+function createInitiativeCard(init) {
+    const div = document.createElement('div');
+    div.className = 'initiative-item';
+    div.setAttribute('role', 'button');
+    div.setAttribute('tabindex', '0');
+    div.setAttribute('aria-label', `View details for ${init.name}`);
+
+    div.addEventListener('click', () => viewInitiativeDetail(init.id));
+    div.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            viewInitiativeDetail(init.id);
+        }
+    });
+
+    div.innerHTML = `
+        <div class="item-left">
+            <span class="badge ${escapeHtml(init.status)}">${escapeHtml(init.status)}</span>
+            <span class="item-title" style="margin-top: 6px;">${escapeHtml(init.name)}</span>
+            <div class="item-meta">
+                <span>Requester: ${escapeHtml(init.requester_name)}</span>
+                <span>Unit: ${escapeHtml(init.requester_unit)}</span>
+                <span>Budget: ${formatCurrency(init.budget_estimate)}</span>
+            </div>
+        </div>
+        <div aria-hidden="true">
+            <svg width="20" height="20" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+        </div>
+    `;
+    return div;
+}
+
+// ============================================================
+// INTAKE FORM SUBMISSION
+// ============================================================
+
+async function submitIntakeForm(event) {
+    event.preventDefault();
+
+    try {
+        const name = Validators.required(document.getElementById('formName').value, 'Initiative Name');
+        const owner_name = Validators.required(document.getElementById('formOwnerName').value, 'Owner Name');
+        const owner_email = Validators.email(document.getElementById('formOwnerEmail').value, 'Owner Email');
+        const background = Validators.maxLength(
+            Validators.required(document.getElementById('formBackground').value, 'Background'),
+            5000, 'Background'
+        );
+        const objective = Validators.maxLength(
+            Validators.required(document.getElementById('formObjective').value, 'Objective'),
+            5000, 'Objective'
+        );
+        const potential_benefits = Validators.maxLength(
+            Validators.required(document.getElementById('formBenefits').value, 'Benefits'),
+            5000, 'Benefits'
+        );
+        const alignment_strategy = Validators.required(document.getElementById('formStrategy').value, 'Strategic Alignment');
+        const capability_type = Validators.required(document.getElementById('formCapType').value, 'Capability Type');
+        const capability_group = Validators.required(document.getElementById('formCapGroup').value, 'Capability Group');
+        const capability_title = Validators.required(document.getElementById('formCapTitle').value, 'Capability Title');
+        const impact_description = Validators.maxLength(
+            Validators.required(document.getElementById('formImpact').value, 'Impact Analysis'),
+            5000, 'Impact Analysis'
+        );
+        const budget_estimate = Validators.positiveNumber(document.getElementById('formBudget').value, 'Budget Estimate');
+        const time_estimate = Validators.required(document.getElementById('formTime').value, 'Time Estimate');
+        const affected_parties = Validators.required(document.getElementById('formAffected').value, 'Affected Parties');
+
+        const persona = Store.get('persona');
+        const payload = {
+            name, owner_name, owner_email, background, objective, potential_benefits,
+            alignment_strategy, capability_type, capability_group, capability_title,
+            impact_description, budget_estimate, time_estimate, affected_parties
+        };
+
+        setLoading(true);
+        try {
+            const resData = await apiRequest('/initiatives/register', {
+                method: 'POST',
+                body: payload
+            });
+            showToast(resData.message, resData.success ? 'success' : 'warning');
+
+            if (resData.success) {
+                document.getElementById('intakeForm').reset();
+                await loadAllInitiatives();
+                switchView('overview');
+            }
+        } catch (e) {
+            const request_number = `IDM-2026-${String(Store.get('initiatives').length + 1).padStart(4, '0')}`;
+            const newInit = {
+                id: 'init-' + Math.random().toString(36).substr(2, 9),
+                request_number,
+                name,
+                request_date: new Date().toISOString(),
+                requester_email: persona.email,
+                requester_name: persona.name,
+                requester_unit: persona.unit,
+                owner_email,
+                owner_name,
+                owner_unit: 'Corporate Services',
+                background, objective, potential_benefits, alignment_strategy,
+                capability_type, capability_group, capability_title,
+                impact_description, budget_estimate, time_estimate, affected_parties,
+                status: 'Submitted',
+                business_case_status: 'In-Progress',
+                solarch_report_status: 'In-Progress'
+            };
+
+            const initiatives = Store.get('initiatives');
+            initiatives.push(newInit);
+            Store.set('initiatives', initiatives);
+
+            renderOverviewStats();
+            renderInboxLists();
+            showToast(`Offline Simulation: Registered Initiative with Number: ${request_number}`, 'warning');
+            document.getElementById('intakeForm').reset();
+            switchView('overview');
+        }
+    } catch (validationError) {
+        if (validationError instanceof ValidationError) {
+            showToast(validationError.message, 'error');
+        } else {
+            console.error('Form submission error:', validationError);
+            showToast('An unexpected error occurred. Please try again.', 'error');
+        }
+    } finally {
+        setLoading(false);
+    }
+}
+
+// ============================================================
+// INITIATIVE DETAIL VIEW
+// ============================================================
+
 async function viewInitiativeDetail(id) {
-    selectedInitiativeId = id;
-    let initiative = activeInitiatives.find(i => i.id === id);
+    const requestId = ++Store._state.lastRequestId;
+    Store.set('selectedId', id);
+
+    let initiative = Store.get('initiatives').find(i => i.id === id);
     if (!initiative) return;
 
     let history = [];
     try {
-        const res = await fetch(`${API_BASE}/initiatives/${id}`, { headers: getAuthHeaders() });
-        const resData = await res.json();
+        const resData = await apiRequest(`/initiatives/${id}`);
         if (resData.success) {
             initiative = resData.data;
             history = resData.history || [];
         }
     } catch(e) {
-        history = [
-            {
-                to_status: initiative.status,
-                updated_by_name: initiative.requester_name,
-                updated_at: initiative.request_date,
-                comments: "Registered and submitted to Nominated Executive Owner."
-            }
-        ];
+        history = [{
+            to_status: initiative.status,
+            updated_by_name: initiative.requester_name,
+            updated_at: initiative.request_date,
+            comments: "Registered and submitted to Nominated Executive Owner."
+        }];
     }
+
+    if (requestId !== Store._state.lastRequestId) return;
 
     switchView('initiative-detail');
-
-    document.getElementById('detailTitle').innerText = initiative.name;
-    document.getElementById('detailMeta').innerText = `${initiative.request_number} | Registered on ${new Date(initiative.request_date).toLocaleDateString()}`;
-    document.getElementById('detailBadge').className = `badge ${initiative.status}`;
-    document.getElementById('detailBadge').innerText = initiative.status;
-
-    document.getElementById('detailBackground').innerText = initiative.background;
-    document.getElementById('detailObjective').innerText = initiative.objective;
-    document.getElementById('detailBenefits').innerText = initiative.potential_benefits;
-    document.getElementById('detailStrategy').innerText = initiative.alignment_strategy;
-    document.getElementById('detailCapCluster').innerText = `${initiative.capability_type} -> ${initiative.capability_group} -> ${initiative.capability_title}`;
-    document.getElementById('detailBudget').innerText = `R ${initiative.budget_estimate.toLocaleString()}`;
-    document.getElementById('detailTime').innerText = initiative.time_estimate;
-
-    const docs = document.getElementById('detailExtraDocs');
-    docs.style.display = 'none';
-    if (initiative.status !== 'Submitted' && initiative.status !== 'Accepted') {
-        docs.style.display = 'flex';
-        document.getElementById('businessCaseLink').innerHTML = `Business Case Status: <strong>${initiative.business_case_status}</strong> <br><small>${initiative.business_case_url || 'https://sharepoint.unisa.local/bc'}</small>`;
-        if (initiative.solarch_report_status === 'Completed') {
-            document.getElementById('solarchReportLink').innerHTML = `Solutions Architecture Report: <strong>${initiative.solarch_report_status}</strong> <br><small>${initiative.solarch_report_url || 'https://sharepoint.unisa.local/report'}</small>`;
-        } else {
-            document.getElementById('solarchReportLink').innerHTML = `SolArch Assessment Report: <span style="color:var(--warning)">In-Progress</span>`;
-        }
-    }
-
-    // Strategic Classification link
-    const strategicClassLink = document.getElementById('strategicClassLink');
-    strategicClassLink.style.display = 'none';
-    if (initiative.strategic_classification) {
-        strategicClassLink.style.display = 'block';
-        strategicClassLink.innerHTML = `
-            <strong>Strategic Classification:</strong>
-            Total Score: <strong>${initiative.strategic_classification.total_weighted_score.toFixed(1)}</strong> |
-            Category: <strong>${initiative.strategic_classification.category}</strong> |
-            Impact: <strong>${initiative.strategic_classification.total_weighted_score < 25 ? 'Minor' : initiative.strategic_classification.total_weighted_score >= 75 ? 'High' : 'Medium'}</strong>
-        `;
-    }
-
-    // SteerCo Scoring link
-    const steercoScoringLink = document.getElementById('steercoScoringLink');
-    steercoScoringLink.style.display = 'none';
-    if (initiative.steerco_scoring) {
-        steercoScoringLink.style.display = 'block';
-        const ss = initiative.steerco_scoring;
-        steercoScoringLink.innerHTML = `
-            <strong>SteerCo Scoring:</strong>
-            Value: <strong>${ss.value.toFixed(1)}</strong> |
-            Ease: <strong>${ss.ease.toFixed(1)}</strong> |
-            Scored: <strong>${new Date(ss.scoring_date).toLocaleDateString()}</strong>
-        `;
-    }
-
-    // Render historical logs
-    const timeline = document.getElementById('detailHistoryTimeline');
-    timeline.innerHTML = '';
-    history.forEach(h => {
-        timeline.innerHTML += `
-            <div class="timeline-node">
-                <span class="timeline-meta">${new Date(h.updated_at).toLocaleString()}</span>
-                <span class="timeline-desc">Changed state to <strong>${h.to_status}</strong> by ${h.updated_by_name}</span>
-                <p style="font-size: 0.75rem; color:var(--text-secondary); margin-top:2px;">"${h.comments || 'No remarks recorded'}"</p>
-            </div>
-        `;
-    });
-
+    renderDetailContent(initiative, history);
     renderActionWorkstation(initiative);
 }
 
-// -------------------------------------------------------------
-// DYNAMIC GOVERNANCE PORTLET GENERATOR (Based on Stage & Role)
-// -------------------------------------------------------------
+function renderDetailContent(initiative, history) {
+    const elements = {
+        title: document.getElementById('detailTitle'),
+        meta: document.getElementById('detailMeta'),
+        badge: document.getElementById('detailBadge'),
+        background: document.getElementById('detailBackground'),
+        objective: document.getElementById('detailObjective'),
+        benefits: document.getElementById('detailBenefits'),
+        strategy: document.getElementById('detailStrategy'),
+        capCluster: document.getElementById('detailCapCluster'),
+        budget: document.getElementById('detailBudget'),
+        time: document.getElementById('detailTime'),
+        timeline: document.getElementById('detailHistoryTimeline')
+    };
+
+    if (elements.title) elements.title.innerText = initiative.name;
+    if (elements.meta) elements.meta.innerText = `${initiative.request_number} | Registered on ${formatDate(initiative.request_date)}`;
+    if (elements.badge) {
+        elements.badge.className = `badge ${escapeHtml(initiative.status)}`;
+        elements.badge.innerText = initiative.status;
+    }
+    if (elements.background) elements.background.innerText = initiative.background;
+    if (elements.objective) elements.objective.innerText = initiative.objective;
+    if (elements.benefits) elements.benefits.innerText = initiative.potential_benefits;
+    if (elements.strategy) elements.strategy.innerText = initiative.alignment_strategy;
+    if (elements.capCluster) elements.capCluster.innerText = `${initiative.capability_type} -> ${initiative.capability_group} -> ${initiative.capability_title}`;
+    if (elements.budget) elements.budget.innerText = formatCurrency(initiative.budget_estimate);
+    if (elements.time) elements.time.innerText = initiative.time_estimate;
+
+    renderDocumentationLinks(initiative);
+
+    if (elements.timeline) {
+        elements.timeline.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+        history.forEach(h => {
+            const node = document.createElement('div');
+            node.className = 'timeline-node';
+            node.innerHTML = `
+                <span class="timeline-meta">${escapeHtml(formatDateTime(h.updated_at))}</span>
+                <span class="timeline-desc">Changed state to <strong>${escapeHtml(h.to_status)}</strong> by ${escapeHtml(h.updated_by_name)}</span>
+                <p style="font-size: 0.75rem; color:var(--text-secondary); margin-top:2px;">"${escapeHtml(h.comments || 'No remarks recorded')}"</p>
+            `;
+            fragment.appendChild(node);
+        });
+        elements.timeline.appendChild(fragment);
+    }
+}
+
+function renderDocumentationLinks(initiative) {
+    const docs = document.getElementById('detailExtraDocs');
+    if (!docs) return;
+
+    docs.style.display = 'none';
+
+    if (initiative.status !== 'Submitted' && initiative.status !== 'Accepted') {
+        docs.style.display = 'flex';
+
+        const bcLink = document.getElementById('businessCaseLink');
+        const solarchLink = document.getElementById('solarchReportLink');
+
+        if (bcLink) {
+            bcLink.innerHTML = `Business Case Status: <strong>${escapeHtml(initiative.business_case_status)}</strong> <br><small>${escapeHtml(initiative.business_case_url || 'https://sharepoint.unisa.local/bc')}</small>`;
+        }
+        if (solarchLink) {
+            if (initiative.solarch_report_status === 'Completed') {
+                solarchLink.innerHTML = `Solutions Architecture Report: <strong>${escapeHtml(initiative.solarch_report_status)}</strong> <br><small>${escapeHtml(initiative.solarch_report_url || 'https://sharepoint.unisa.local/report')}</small>`;
+            } else {
+                solarchLink.innerHTML = `SolArch Assessment Report: <span style="color:var(--warning)">In-Progress</span>`;
+            }
+        }
+    }
+
+    const strategicClassLink = document.getElementById('strategicClassLink');
+    if (strategicClassLink) {
+        strategicClassLink.style.display = 'none';
+        if (initiative.strategic_classification) {
+            strategicClassLink.style.display = 'block';
+            const sc = initiative.strategic_classification;
+            const impact = deriveStrategicImpact(sc);
+            strategicClassLink.innerHTML = `
+                <strong>Strategic Classification:</strong>
+                Total Score: <strong>${formatNumber(sc.total_weighted_score)}</strong> |
+                Category: <strong>${escapeHtml(sc.category)}</strong> |
+                Impact: <strong>${escapeHtml(impact)}</strong>
+            `;
+        }
+    }
+
+    const steercoScoringLink = document.getElementById('steercoScoringLink');
+    if (steercoScoringLink) {
+        steercoScoringLink.style.display = 'none';
+        if (initiative.steerco_scoring) {
+            steercoScoringLink.style.display = 'block';
+            const ss = initiative.steerco_scoring;
+            steercoScoringLink.innerHTML = `
+                <strong>SteerCo Scoring:</strong>
+                Value: <strong>${formatNumber(ss.value)}</strong> |
+                Ease: <strong>${formatNumber(ss.ease)}</strong> |
+                Scored: <strong>${escapeHtml(formatDate(ss.scoring_date))}</strong>
+            `;
+        }
+    }
+}
+
+// ============================================================
+// DYNAMIC ACTION WORKSTATION (Refactored State Machine)
+// ============================================================
+
 function renderActionWorkstation(init) {
     const container = document.getElementById('actionFieldsContainer');
+    if (!container) return;
     container.innerHTML = '';
 
-    // Parked state - Unpark for Demand Planner
-    if (init.status === 'Parked') {
-        if (currentPersona.role === 'Demand Planner') {
-            container.innerHTML = `
-                <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px;">
-                    This initiative is <strong>Parked</strong>. You can unpark it to return to Accepted state.
-                </p>
-                <div class="form-group" style="margin-bottom:12px;">
-                    <label>Unpark Comments</label>
-                    <textarea class="form-input" id="unparkComments" placeholder="Reason for unparking..."></textarea>
-                </div>
-                <button class="action-btn" style="background:var(--success)" onclick="executeTransition('unpark')">Unpark Initiative</button>
-            `;
-        } else {
-            container.innerHTML = `<p style="color:var(--text-secondary)">This initiative is <strong>Parked</strong>. Awaiting Demand Planner action.</p>`;
-        }
-        return;
-    }
-
-    // If fully approved or declined, lock action box
     if (init.status === 'Approved' || init.status === 'Declined') {
-        container.innerHTML = `<p style="color:var(--text-secondary)">This initiative has concluded in state <strong>${init.status}</strong>. Workstation locked.</p>`;
+        container.innerHTML = `<p style="color:var(--text-secondary)">This initiative has concluded in state <strong>${escapeHtml(init.status)}</strong>. Workstation locked.</p>`;
         return;
     }
 
-    // 1. Nominated Owner Acceptance (UC2)
-    if (init.status === 'Submitted') {
-        if (currentPersona.role === 'Initiative Owner' && init.owner_email === currentPersona.email) {
-            container.innerHTML = `
-                <div class="form-group" style="margin-bottom: 12px;">
-                    <label>Acceptance Comments / Remarks</label>
-                    <textarea class="form-input" id="ownerComments" placeholder="Enter comments here..."></textarea>
-                </div>
-                <div style="display:flex; gap:12px;">
-                    <button class="action-btn" style="background:var(--success)" onclick="executeTransition('accept', 'Accept')">Accept Request</button>
-                    <button class="action-btn" style="background:var(--danger)" onclick="executeTransition('accept', 'Decline')">Decline</button>
-                </div>
-            `;
+    const stateDef = WORKFLOW_STATES[init.status];
+    if (!stateDef) {
+        container.innerHTML = `<p style="color:var(--text-secondary)">Unknown status: ${escapeHtml(init.status)}</p>`;
+        return;
+    }
+
+    const persona = Store.get('persona');
+    const isAuthorized = stateDef.allowedRoles?.includes(persona.role) &&
+                        (!stateDef.condition || stateDef.condition(init, persona));
+
+    if (!isAuthorized) {
+        const pendingRole = stateDef.allowedRoles.join(' or ');
+        container.innerHTML = `<p style="color:var(--text-secondary)">Awaiting <strong>${escapeHtml(pendingRole)}</strong> action.</p>`;
+        return;
+    }
+
+    const config = stateDef.render(init, persona);
+    const fragment = document.createDocumentFragment();
+
+    if (config.badges?.length) {
+        const badgeDiv = document.createElement('div');
+        badgeDiv.style.cssText = 'display:flex;gap:12px;margin-bottom:12px;';
+        badgeDiv.innerHTML = config.badges.join('');
+        fragment.appendChild(badgeDiv);
+    }
+
+    if (config.message) {
+        const p = document.createElement('p');
+        p.style.cssText = 'font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px;';
+        p.innerHTML = config.message;
+        fragment.appendChild(p);
+    }
+
+    config.fields?.forEach(field => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'form-group';
+        wrapper.style.marginBottom = '12px';
+
+        const label = document.createElement('label');
+        label.textContent = field.label;
+        wrapper.appendChild(label);
+
+        let input;
+        if (field.type === 'textarea') {
+            input = document.createElement('textarea');
+            input.className = 'form-input';
+            if (field.placeholder) input.placeholder = field.placeholder;
+        } else if (field.type === 'select') {
+            input = document.createElement('select');
+            input.className = 'form-input';
+            field.options?.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.label;
+                input.appendChild(option);
+            });
         } else {
-            container.innerHTML = `<p style="color:var(--text-secondary)">Awaiting nominated Executive Owner (<strong>${init.owner_name}</strong>) to accept/decline the request.</p>`;
+            input = document.createElement('input');
+            input.type = field.type || 'text';
+            input.className = 'form-input';
+            if (field.value) input.value = field.value;
+            if (field.readonly) input.readOnly = true;
         }
-        return;
-    }
 
-    // 2. Demand Planner Review & Assignment (UC3)
-    if (init.status === 'Accepted') {
-        if (currentPersona.role === 'Demand Planner') {
-            container.innerHTML = `
-                <div class="form-group" style="margin-bottom:12px;">
-                    <label>Assign Governance Reviewer *</label>
-                    <select class="form-input" id="assignReviewer">
-                        <option value="dev.arch@unisa.ac.za|Dev Solutions">Dev Solutions (Enterprise Architecture)</option>
-                        <option value="jane.doe@unisa.ac.za|Jane Doe">Jane Doe (Academic Affairs)</option>
-                    </select>
-                </div>
-                <div style="display:flex; gap:12px;">
-                    <button class="action-btn" onclick="executeTransition('assign', 'Assign')">Assign & Set Reviewed</button>
-                    <button class="action-btn" style="background:var(--warning)" onclick="executeTransition('assign', 'Park')">Park Initiative</button>
-                </div>
-            `;
-        } else {
-            container.innerHTML = `<p style="color:var(--text-secondary)">Awaiting Demand Planner to assign a governance Reviewer.</p>`;
-        }
-        return;
-    }
+        input.id = field.id;
+        wrapper.appendChild(input);
+        fragment.appendChild(wrapper);
+    });
 
-    // 3. Reviewer Meeting, Impact Class & Business Case Upload (UC4)
-    if (init.status === 'Reviewed') {
-        if (currentPersona.role === 'Solutions Architect' || currentPersona.role === 'Demand Planner') {
-            const sc = init.strategic_classification;
-            const derivedImpact = !sc ? 'Not yet classified' :
-                sc.total_weighted_score < 25 ? 'Minor' :
-                sc.total_weighted_score >= 75 ? 'High' : 'Medium';
+    const btnGroup = document.createElement('div');
+    btnGroup.style.cssText = 'display:flex; gap:12px;';
+    config.actions?.forEach(btn => {
+        const button = document.createElement('button');
+        button.className = 'action-btn';
+        button.textContent = btn.label;
+        button.style.background = `var(--${btn.style})`;
 
-            container.innerHTML = `
-                <div class="form-group" style="margin-bottom:12px;">
-                    <label>Derived Strategic Impact (from Classification)</label>
-                    <input type="text" class="form-input" value="${derivedImpact}" readonly style="font-weight:600;color:var(--accent);">
-                </div>
-                <div class="form-group" style="margin-bottom:12px;">
-                    <label>Business Case Document Status *</label>
-                    <select class="form-input" id="reviewBcStatus">
-                        <option value="In-Progress">In-Progress (Draft)</option>
-                        <option value="Signed-Fully">Signed-Fully (Uploaded to SharePoint)</option>
-                    </select>
-                </div>
-                <button class="action-btn" onclick="executeTransition('review')">Submit Review</button>
-            `;
-        } else {
-            container.innerHTML = `<p style="color:var(--text-secondary)">Awaiting Solutions Architect / Reviewer to classify initiative and upload Business Case.</p>`;
-        }
-        return;
-    }
-
-    // 4. Solutions Architecture Assessment (UC5)
-    if (init.status === 'SolArch') {
-        if (currentPersona.role === 'Solutions Architect') {
-            container.innerHTML = `
-                <div class="form-group" style="margin-bottom:12px;">
-                    <label>SolArch Assessment Report Status *</label>
-                    <select class="form-input" id="assessReportStatus">
-                        <option value="In-Progress">In-Progress</option>
-                        <option value="Completed">Completed (Uploaded to SharePoint)</option>
-                    </select>
-                </div>
-                <button class="action-btn" onclick="executeTransition('assess')">Submit Assessment</button>
-            `;
-        } else {
-            container.innerHTML = `<p style="color:var(--text-secondary)">Awaiting Enterprise Architect to assess and upload SolArch report.</p>`;
-        }
-        return;
-    }
-
-    // 5. Solutions Architecture Committee Recommendation (UC6)
-    if (init.status === 'Assessed') {
-        if (currentPersona.role === 'ICT SteerCo Secretariat' || currentPersona.role === 'Solutions Architect') {
-            container.innerHTML = `
-                <div class="form-group" style="margin-bottom:12px;">
-                    <label>Committee Meeting Recommendation *</label>
-                    <select class="form-input" id="recommendDecision">
-                        <option value="Recommended">Recommended (To ICT SteerCo)</option>
-                        <option value="Declined">Declined</option>
-                        <option value="Referred Back">Referred Back to Owner</option>
-                    </select>
-                </div>
-                <button class="action-btn" onclick="executeTransition('recommend')">Record Recommendation</button>
-            `;
-        } else {
-            container.innerHTML = `<p style="color:var(--text-secondary)">Awaiting Secretariat to register SolArch meeting decision.</p>`;
-        }
-        return;
-    }
-
-    // 6. ICT SteerCo Secretariat Approval (UC7)
-    if (init.status === 'Recommended') {
-        if (currentPersona.role === 'ICT SteerCo Secretariat') {
-            let valueBadge = '';
-            let easeBadge = '';
-            if (init.steerco_scoring) {
-                const v = init.steerco_scoring.value;
-                const e = init.steerco_scoring.ease;
-                const vColor = v >= 15 ? 'var(--success)' : v >= 10 ? 'var(--warning)' : 'var(--danger)';
-                const eColor = e >= 30 ? 'var(--success)' : e >= 20 ? 'var(--warning)' : 'var(--danger)';
-                valueBadge = `<span style="display:inline-block;padding:4px 12px;border-radius:20px;background:${vColor}20;color:${vColor};font-weight:600;font-size:0.85rem;">Value: ${v.toFixed(1)}</span>`;
-                easeBadge = `<span style="display:inline-block;padding:4px 12px;border-radius:20px;background:${eColor}20;color:${eColor};font-weight:600;font-size:0.85rem;">Ease: ${e.toFixed(1)}</span>`;
-            } else {
-                valueBadge = `<span style="color:var(--text-secondary);font-size:0.85rem;">Value: Not scored yet</span>`;
-                easeBadge = `<span style="color:var(--text-secondary);font-size:0.85rem;">Ease: Not scored yet</span>`;
+        button.addEventListener('click', async () => {
+            if (btn.confirm) {
+                const confirmed = await showConfirmDialog(`Are you sure you want to ${btn.label.toLowerCase()} this initiative?`);
+                if (!confirmed) return;
             }
+            executeTransition(btn.action, btn.arg);
+        });
 
-            container.innerHTML = `
-                <div class="form-group" style="margin-bottom:12px;">
-                    <label>SteerCo Final Decision *</label>
-                    <select class="form-input" id="steercoDecision">
-                        <option value="Approved">Approved as Project</option>
-                        <option value="Declined">Declined</option>
-                        <option value="Referred Back">Referred Back to Owner</option>
-                    </select>
-                </div>
-                <div style="display:flex;gap:12px;margin-bottom:12px;">
-                    ${valueBadge}
-                    ${easeBadge}
-                </div>
-                <div class="form-group" style="margin-bottom:12px;">
-                    <label>Approval Comments</label>
-                    <textarea class="form-input" id="approveComments" placeholder="Enter any remarks..."></textarea>
-                </div>
-                <button class="action-btn" onclick="executeTransition('approve')">Submit Decision</button>
-            `;
-        } else {
-            container.innerHTML = `<p style="color:var(--text-secondary)">Awaiting ICT SteerCo Committee Secretariat to record final project approval decision.</p>`;
-        }
-        return;
-    }
+        btnGroup.appendChild(button);
+    });
+    fragment.appendChild(btnGroup);
+
+    container.appendChild(fragment);
 }
 
-// -------------------------------------------------------------
-// WORKFLOW STATE MACHINE TRANSITION ENGINES
-// -------------------------------------------------------------
+// ============================================================
+// WORKFLOW STATE TRANSITIONS
+// ============================================================
+
 async function executeTransition(actionType, extraArg) {
-    const id = selectedInitiativeId;
-    let url = `${API_BASE}/initiatives/${id}/${actionType}`;
+    const id = Store.get('selectedId');
+    if (!id) return;
+
     let payload = {};
 
-    if (actionType === 'accept') {
-        payload = {
-            action: extraArg,
-            comments: document.getElementById('ownerComments').value
-        };
-    } else if (actionType === 'assign') {
-        if (extraArg === 'Park') {
-            payload = { action: 'Park' };
-        } else {
-            const selectVal = document.getElementById('assignReviewer').value.split('|');
+    switch (actionType) {
+        case 'accept':
             payload = {
-                reviewer_email: selectVal[0],
-                reviewer_name: selectVal[1],
-                action: 'Assign'
+                action: extraArg,
+                comments: document.getElementById('ownerComments')?.value || ''
             };
-        }
-    } else if (actionType === 'review') {
-        payload = {
-            business_case_status: document.getElementById('reviewBcStatus').value,
-            initiative_impact_class: document.getElementById('reviewImpact')?.value || 'Medium'
-        };
-    } else if (actionType === 'assess') {
-        payload = {
-            solarch_report_status: document.getElementById('assessReportStatus').value
-        };
-    } else if (actionType === 'recommend') {
-        payload = {
-            recommendation: document.getElementById('recommendDecision').value
-        };
-    } else if (actionType === 'approve') {
-        payload = {
-            approval_action: document.getElementById('steercoDecision').value,
-            comments: document.getElementById('approveComments')?.value || ''
-        };
-    } else if (actionType === 'classify') {
-        payload = {
-            scores: window._pendingSCScores || {},
-            total_weighted_score: parseFloat(document.getElementById('scTotalCell')?.innerText || '0'),
-            category: document.getElementById('scCategoryCell')?.innerText || 'Not Classified'
-        };
-    } else if (actionType === 'steerco-scoring') {
-        payload = {
-            dimensions: window._pendingSteercoScores || {}
-        };
-    } else if (actionType === 'unpark') {
-        payload = {
-            comments: document.getElementById('unparkComments')?.value || ''
-        };
+            break;
+        case 'assign':
+            if (extraArg === 'Park') {
+                payload = { action: 'Park' };
+            } else {
+                const selectVal = document.getElementById('assignReviewer')?.value.split('|') || [];
+                payload = {
+                    reviewer_email: selectVal[0],
+                    reviewer_name: selectVal[1],
+                    action: 'Assign'
+                };
+            }
+            break;
+        case 'review':
+            payload = {
+                business_case_status: document.getElementById('reviewBcStatus')?.value,
+                initiative_impact_class: document.getElementById('reviewImpact')?.value || 'Medium'
+            };
+            break;
+        case 'assess':
+            payload = {
+                solarch_report_status: document.getElementById('assessReportStatus')?.value
+            };
+            break;
+        case 'recommend':
+            payload = {
+                recommendation: document.getElementById('recommendDecision')?.value
+            };
+            break;
+        case 'approve':
+            payload = {
+                approval_action: document.getElementById('steercoDecision')?.value,
+                comments: document.getElementById('approveComments')?.value || ''
+            };
+            break;
+        case 'unpark':
+            payload = {
+                comments: document.getElementById('unparkComments')?.value || ''
+            };
+            break;
+        default:
+            console.warn('Unknown action type:', actionType);
+            return;
     }
 
+    setLoading(true);
     try {
-        const response = await fetch(url, {
+        const resData = await apiRequest(`/initiatives/${id}/${actionType}`, {
             method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(payload)
+            body: payload
         });
-        const resData = await response.json();
-        showToast(resData.message);
+        showToast(resData.message, resData.success ? 'success' : 'warning');
 
         if (resData.success) {
-            loadAllInitiatives();
-            setTimeout(() => {
-                viewInitiativeDetail(id);
-            }, 300);
+            await loadAllInitiatives();
+            setTimeout(() => viewInitiativeDetail(id), 300);
         }
     } catch (e) {
-        showToast("Simulating workflow state update locally...");
-        const idx = activeInitiatives.findIndex(i => i.id === id);
-        if (idx !== -1) {
-            const target = activeInitiatives[idx];
-            if (actionType === 'accept') {
-                target.status = extraArg === 'Accept' ? 'Accepted' : 'Declined';
-                target.decline_reason = extraArg === 'Decline' ? payload.comments : undefined;
-            } else if (actionType === 'assign') {
-                target.status = extraArg === 'Park' ? 'Parked' : 'Reviewed';
-                if (payload.reviewer_name) {
-                    target.reviewer_name = payload.reviewer_name;
-                    target.reviewer_email = payload.reviewer_email;
-                }
-            } else if (actionType === 'review') {
-                target.business_case_status = payload.business_case_status;
-                target.status = payload.business_case_status === 'Signed-Fully' ? 'SolArch' : 'Reviewed';
-            } else if (actionType === 'assess') {
-                target.solarch_report_status = payload.solarch_report_status;
-                target.status = payload.solarch_report_status === 'Completed' ? 'Assessed' : 'SolArch';
-            } else if (actionType === 'recommend') {
-                target.status = payload.recommendation;
-            } else if (actionType === 'approve') {
-                target.status = payload.approval_action;
-            } else if (actionType === 'classify') {
-                target.strategic_classification = {
-                    scores: payload.scores,
-                    total_weighted_score: payload.total_weighted_score,
-                    category: payload.category
-                };
-            } else if (actionType === 'steerco-scoring') {
-                target.steerco_scoring = payload.dimensions;
-            } else if (actionType === 'unpark') {
-                target.status = 'Accepted';
-            }
-
-            activeInitiatives[idx] = target;
-            renderOverviewStats();
-            renderInboxLists();
-            setTimeout(() => {
-                viewInitiativeDetail(id);
-            }, 300);
-        }
+        showToast("Simulating workflow state update locally...", 'warning');
+        simulateTransition(id, actionType, extraArg, payload);
+    } finally {
+        setLoading(false);
     }
 }
 
-// -------------------------------------------------------------
+function simulateTransition(id, actionType, extraArg, payload) {
+    const initiatives = Store.get('initiatives');
+    const idx = initiatives.findIndex(i => i.id === id);
+    if (idx === -1) return;
+
+    const target = { ...initiatives[idx] };
+
+    switch (actionType) {
+        case 'accept':
+            target.status = extraArg === 'Accept' ? 'Accepted' : 'Declined';
+            if (extraArg === 'Decline') target.decline_reason = payload.comments;
+            break;
+        case 'assign':
+            target.status = extraArg === 'Park' ? 'Parked' : 'Reviewed';
+            if (payload.reviewer_name) {
+                target.reviewer_name = payload.reviewer_name;
+                target.reviewer_email = payload.reviewer_email;
+            }
+            break;
+        case 'review':
+            target.business_case_status = payload.business_case_status;
+            target.status = payload.business_case_status === 'Signed-Fully' ? 'SolArch' : 'Reviewed';
+            break;
+        case 'assess':
+            target.solarch_report_status = payload.solarch_report_status;
+            target.status = payload.solarch_report_status === 'Completed' ? 'Assessed' : 'SolArch';
+            break;
+        case 'recommend':
+            target.status = payload.recommendation;
+            break;
+        case 'approve':
+            target.status = payload.approval_action;
+            break;
+        case 'unpark':
+            target.status = 'Accepted';
+            break;
+    }
+
+    initiatives[idx] = target;
+    Store.set('initiatives', initiatives);
+    renderOverviewStats();
+    renderInboxLists();
+    setTimeout(() => viewInitiativeDetail(id), 300);
+}
+
+// ============================================================
 // STRATEGIC CLASSIFICATION ENGINE
-// -------------------------------------------------------------
+// ============================================================
+
 function renderStrategicClassificationList() {
     const container = document.getElementById('strategicClassifictionInitiativesList');
     const matrix = document.getElementById('strategicClassificationMatrix');
-    matrix.style.display = 'none';
-    container.innerHTML = '';
+    if (matrix) matrix.style.display = 'none';
+    if (!container) return;
 
-    const eligible = activeInitiatives.filter(i =>
+    container.innerHTML = '';
+    const initiatives = Store.get('initiatives');
+    const eligible = initiatives.filter(i =>
         i.status !== 'Submitted' && i.status !== 'Draft' && i.status !== 'Declined'
     );
 
     if (eligible.length === 0) {
-        container.innerHTML = `<p style="color:var(--text-secondary);padding:20px;">No initiatives available for classification.</p>`;
+        container.innerHTML = `<p style="color:var(--text-secondary);padding:20px;" role="status">No initiatives available for classification.</p>`;
         return;
     }
 
+    const fragment = document.createDocumentFragment();
     eligible.forEach(init => {
         const classified = init.strategic_classification ? ' (Classified)' : '';
-        container.innerHTML += `
-            <div class="initiative-item" onclick="classifyInitiative('${init.id}')">
-                <div class="item-left">
-                    <span class="badge ${init.status}">${init.status}</span>
-                    <span class="item-title" style="margin-top:6px;">${init.name}${classified}</span>
-                </div>
-                <div>
-                    <svg width="20" height="20" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
-                </div>
+        const div = document.createElement('div');
+        div.className = 'initiative-item';
+        div.setAttribute('role', 'button');
+        div.setAttribute('tabindex', '0');
+        div.setAttribute('aria-label', `Classify ${init.name}`);
+        div.addEventListener('click', () => classifyInitiative(init.id));
+        div.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                classifyInitiative(init.id);
+            }
+        });
+        div.innerHTML = `
+            <div class="item-left">
+                <span class="badge ${escapeHtml(init.status)}">${escapeHtml(init.status)}</span>
+                <span class="item-title" style="margin-top:6px;">${escapeHtml(init.name)}${escapeHtml(classified)}</span>
+            </div>
+            <div aria-hidden="true">
+                <svg width="20" height="20" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
             </div>
         `;
+        fragment.appendChild(div);
     });
+    container.appendChild(fragment);
 }
 
 function classifyInitiative(id) {
-    selectedInitiativeId = id;
-    const initiative = activeInitiatives.find(i => i.id === id);
+    Store.set('selectedId', id);
+    const initiative = Store.get('initiatives').find(i => i.id === id);
     if (!initiative) return;
 
     switchView('strategic-classification');
-
     const matrix = document.getElementById('strategicClassificationMatrix');
+    if (!matrix) return;
     matrix.style.display = 'block';
 
-    const pillars = [
-        { name: "Pillar 1: Advance Technology Mediated, Quality Learning and Teaching", weight: 17 },
-        { name: "Pillar 2: Propel Research Innovation", weight: 15 },
-        { name: "Pillar 3: Pivot Engaged Scholarship and Global Impact", weight: 13 },
-        { name: "Pillar 4: Strengthen Student Support Services", weight: 11 },
-        { name: "Pillar 5: Resourcing our Futures", weight: 9 },
-        { name: "Enabler 1: People", weight: 7 },
-        { name: "Enabler 2: Digitalization and Digitization", weight: 7 },
-        { name: "Enabler 3: Governance, Reporting and Management Systems", weight: 7 },
-        { name: "Enabler 4: Financial Sustainability", weight: 7 },
-        { name: "Enabler 5: Infrastructure and Operations", weight: 7 }
-    ];
-
     const saved = initiative.strategic_classification?.scores || {};
-    window._pendingSCScores = { ...saved };
+    Store.set('pendingScores', new Map(Object.entries(saved)));
 
     let html = `
         <h3 style="margin-bottom:8px;">Strategic Classification Matrix</h3>
         <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:20px;">
-            Scoring: <strong>${initiative.name}</strong>
+            Scoring: <strong>${escapeHtml(initiative.name)}</strong>
         </p>
         <table class="classification-table">
             <thead>
@@ -854,15 +1375,15 @@ function classifyInitiative(id) {
             <tbody>
     `;
 
-    pillars.forEach((pillar, i) => {
+    STRATEGIC_FRAMEWORK.pillars.forEach((pillar, i) => {
         const savedScore = saved[pillar.name] || 0;
         const weighted = (savedScore * pillar.weight / 10).toFixed(1);
         html += `
             <tr>
-                <td>${pillar.name}</td>
+                <td>${escapeHtml(pillar.name)}</td>
                 <td>${pillar.weight}</td>
                 <td>
-                    <select class="sc-score-select" data-pillar="${pillar.name}" onchange="updateSCScore('${id}', this)">
+                    <select class="sc-score-select" data-pillar="${escapeHtml(pillar.name)}" onchange="updateSCScore(this)">
                         ${[0,1,5,10].map(s => `<option value="${s}" ${s === savedScore ? 'selected' : ''}>${s === 0 ? 'None (0)' : s === 1 ? 'Low (1)' : s === 5 ? 'Moderate (5)' : 'High (10)'}</option>`).join('')}
                     </select>
                 </td>
@@ -871,12 +1392,7 @@ function classifyInitiative(id) {
         `;
     });
 
-    let total = 0;
-    pillars.forEach((p, i) => {
-        const sc = saved[p.name] || 0;
-        total += sc * p.weight / 10;
-    });
-    const cat = total < 25 ? 'Minor' : total >= 75 ? 'High' : 'Medium';
+    const result = calculateStrategicClassification(saved);
 
     html += `
             </tbody>
@@ -885,145 +1401,184 @@ function classifyInitiative(id) {
                     <td><strong>Total Weighted Score</strong></td>
                     <td></td>
                     <td></td>
-                    <td id="scTotalCell">${total.toFixed(1)}</td>
+                    <td id="scTotalCell">${formatNumber(result.total)}</td>
                 </tr>
                 <tr>
                     <td><strong>Classification</strong></td>
                     <td></td>
                     <td></td>
-                    <td id="scCategoryCell">${cat}</td>
+                    <td id="scCategoryCell">${escapeHtml(result.category)}</td>
                 </tr>
             </tfoot>
         </table>
         <div style="margin-top:20px;display:flex;gap:12px;">
-            <button class="action-btn" onclick="submitStrategicClassification('${id}')">Save Classification</button>
+            <button class="action-btn" onclick="submitStrategicClassification()">Save Classification</button>
         </div>
     `;
 
     matrix.innerHTML = html;
 }
 
-function updateSCScore(id, select) {
+function updateSCScore(select) {
     const pillar = select.getAttribute('data-pillar');
     const score = parseInt(select.value);
-    window._pendingSCScores[pillar] = score;
+    const scores = Store.get('pendingScores');
+    scores.set(pillar, score);
+    Store.set('pendingScores', scores);
 
-    const pillars = [
-        { name: "Pillar 1: Advance Technology Mediated, Quality Learning and Teaching", weight: 17 },
-        { name: "Pillar 2: Propel Research Innovation", weight: 15 },
-        { name: "Pillar 3: Pivot Engaged Scholarship and Global Impact", weight: 13 },
-        { name: "Pillar 4: Strengthen Student Support Services", weight: 11 },
-        { name: "Pillar 5: Resourcing our Futures", weight: 9 },
-        { name: "Enabler 1: People", weight: 7 },
-        { name: "Enabler 2: Digitalization and Digitization", weight: 7 },
-        { name: "Enabler 3: Governance, Reporting and Management Systems", weight: 7 },
-        { name: "Enabler 4: Financial Sustainability", weight: 7 },
-        { name: "Enabler 5: Infrastructure and Operations", weight: 7 }
-    ];
+    const result = calculateStrategicClassification(Object.fromEntries(scores));
 
-    let total = 0;
-    pillars.forEach((p, i) => {
-        const s = window._pendingSCScores[p.name] || 0;
-        const weighted = s * p.weight / 10;
-        total += weighted;
+    STRATEGIC_FRAMEWORK.pillars.forEach((p, i) => {
+        const s = scores.get(p.name) || 0;
+        const weighted = (s * p.weight / 10).toFixed(1);
         const cell = document.getElementById(`w_${i}`);
-        if (cell) cell.innerText = weighted.toFixed(1);
+        if (cell) cell.innerText = weighted;
     });
 
-    const cat = total < 25 ? 'Minor' : total >= 75 ? 'High' : 'Medium';
-    document.getElementById('scTotalCell').innerText = total.toFixed(1);
-    document.getElementById('scCategoryCell').innerText = cat;
+    const totalCell = document.getElementById('scTotalCell');
+    const categoryCell = document.getElementById('scCategoryCell');
+    if (totalCell) totalCell.innerText = formatNumber(result.total);
+    if (categoryCell) categoryCell.innerText = result.category;
 }
 
-async function submitStrategicClassification(id) {
-    const scores = window._pendingSCScores || {};
+async function submitStrategicClassification() {
+    const id = Store.get('selectedId');
+    const scores = Object.fromEntries(Store.get('pendingScores'));
+    const result = calculateStrategicClassification(scores);
 
-    const pillars = [
-        { name: "Pillar 1: Advance Technology Mediated, Quality Learning and Teaching", weight: 17 },
-        { name: "Pillar 2: Propel Research Innovation", weight: 15 },
-        { name: "Pillar 3: Pivot Engaged Scholarship and Global Impact", weight: 13 },
-        { name: "Pillar 4: Strengthen Student Support Services", weight: 11 },
-        { name: "Pillar 5: Resourcing our Futures", weight: 9 },
-        { name: "Enabler 1: People", weight: 7 },
-        { name: "Enabler 2: Digitalization and Digitization", weight: 7 },
-        { name: "Enabler 3: Governance, Reporting and Management Systems", weight: 7 },
-        { name: "Enabler 4: Financial Sustainability", weight: 7 },
-        { name: "Enabler 5: Infrastructure and Operations", weight: 7 }
-    ];
-
-    let total = 0;
-    pillars.forEach(p => {
-        const s = scores[p.name] || 0;
-        total += s * p.weight / 10;
-    });
-    const category = total < 25 ? 'Minor' : total >= 75 ? 'High' : 'Medium';
-
+    setLoading(true);
     try {
-        const response = await fetch(`${API_BASE}/initiatives/${id}/strategic-classification`, {
+        const resData = await apiRequest(`/initiatives/${id}/strategic-classification`, {
             method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({ scores, total_weighted_score: total, category })
+            body: {
+                scores,
+                total_weighted_score: result.total,
+                category: result.category
+            }
         });
-        const resData = await response.json();
-        showToast(resData.message);
+        showToast(resData.message, resData.success ? 'success' : 'warning');
         if (resData.success) {
-            loadAllInitiatives();
+            await loadAllInitiatives();
             renderStrategicClassificationList();
         }
     } catch (e) {
-        showToast("Offline: Classification saved locally.");
-        const idx = activeInitiatives.findIndex(i => i.id === id);
+        showToast("Offline: Classification saved locally.", 'warning');
+        const initiatives = Store.get('initiatives');
+        const idx = initiatives.findIndex(i => i.id === id);
         if (idx !== -1) {
-            activeInitiatives[idx].strategic_classification = { scores, total_weighted_score: total, category };
+            initiatives[idx] = {
+                ...initiatives[idx],
+                strategic_classification: { scores, total_weighted_score: result.total, category: result.category }
+            };
+            Store.set('initiatives', initiatives);
         }
+    } finally {
+        setLoading(false);
     }
 }
 
-// -------------------------------------------------------------
-// STEERCO VALUE & EASE SCORING ENGINE
-// -------------------------------------------------------------
+// ============================================================
+// STEERCO SCORING ENGINE
+// ============================================================
+
+const STEERCO_DIMENSIONS = [
+    { key: 'ict_demand', label: 'Type of ICT Demand', desc: 'Complexity of the ICT demand' },
+    { key: 'effort', label: 'Effort', desc: 'Estimated effort required' },
+    { key: 'system_readiness', label: 'System Readiness', desc: 'Most appropriate system option' },
+    { key: 'cost', label: 'Cost', desc: 'Financial cost impact' },
+    { key: 'likelihood_success', label: 'Likelihood of Success', desc: 'Probability of successful delivery' },
+    { key: 'resources', label: 'Resources', desc: 'Human Resources required' }
+];
+
+const STEERCO_OPTIONS = {
+    ict_demand: [
+        { value: 1, label: 'Tactical Demand (1)' },
+        { value: 5, label: 'Operational Demand (5)' },
+        { value: 10, label: 'Strategic Demand (10)' }
+    ],
+    effort: [
+        { value: 1, label: '> 6 months (1)' },
+        { value: 5, label: '> 2 months and \u2264 6 months (5)' },
+        { value: 10, label: '\u2264 2 months (10)' }
+    ],
+    system_readiness: [
+        { value: 1, label: 'Major custom dev required (1)' },
+        { value: 5, label: 'Minor custom dev required (5)' },
+        { value: 10, label: 'Off-The-Shelf system (10)' }
+    ],
+    cost: [
+        { value: 1, label: '> R5m (1)' },
+        { value: 5, label: '> R1m and \u2264 R5m (5)' },
+        { value: 10, label: '\u2264 R1m (10)' }
+    ],
+    likelihood_success: [
+        { value: 1, label: 'Even odds (1)' },
+        { value: 5, label: 'Good odds (5)' },
+        { value: 10, label: 'Great odds (10)' }
+    ],
+    resources: [
+        { value: 1, label: '> 10 (1)' },
+        { value: 5, label: '> 6 and \u2264 10 (5)' },
+        { value: 10, label: '\u2264 6 (10)' }
+    ]
+};
+
 function renderSteercoScoringList() {
     const container = document.getElementById('steercoScoringInitiativesList');
     const matrix = document.getElementById('steercoScoringMatrix');
-    matrix.style.display = 'none';
-    container.innerHTML = '';
+    if (matrix) matrix.style.display = 'none';
+    if (!container) return;
 
-    const eligible = activeInitiatives.filter(i =>
+    container.innerHTML = '';
+    const initiatives = Store.get('initiatives');
+    const eligible = initiatives.filter(i =>
         i.strategic_classification && i.status !== 'Submitted' && i.status !== 'Draft' && i.status !== 'Declined'
     );
 
     if (eligible.length === 0) {
-        container.innerHTML = `<p style="color:var(--text-secondary);padding:20px;">No initiatives with Strategic Classification available for SteerCo scoring.</p>`;
+        container.innerHTML = `<p style="color:var(--text-secondary);padding:20px;" role="status">No initiatives with Strategic Classification available for SteerCo scoring.</p>`;
         return;
     }
 
+    const fragment = document.createDocumentFragment();
     eligible.forEach(init => {
         const scored = init.steerco_scoring ? ' (Scored)' : '';
-        container.innerHTML += `
-            <div class="initiative-item" onclick="calculateSteercoScore('${init.id}')">
-                <div class="item-left">
-                    <span class="badge ${init.status}">${init.status}</span>
-                    <span class="item-title" style="margin-top:6px;">${init.name}${scored}</span>
-                </div>
-                <div>
-                    <svg width="20" height="20" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
-                </div>
+        const div = document.createElement('div');
+        div.className = 'initiative-item';
+        div.setAttribute('role', 'button');
+        div.setAttribute('tabindex', '0');
+        div.setAttribute('aria-label', `Score ${init.name}`);
+        div.addEventListener('click', () => calculateSteercoScore(init.id));
+        div.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                calculateSteercoScore(init.id);
+            }
+        });
+        div.innerHTML = `
+            <div class="item-left">
+                <span class="badge ${escapeHtml(init.status)}">${escapeHtml(init.status)}</span>
+                <span class="item-title" style="margin-top:6px;">${escapeHtml(init.name)}${escapeHtml(scored)}</span>
+            </div>
+            <div aria-hidden="true">
+                <svg width="20" height="20" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
             </div>
         `;
+        fragment.appendChild(div);
     });
+    container.appendChild(fragment);
 }
 
 function calculateSteercoScore(id) {
-    selectedInitiativeId = id;
-    const initiative = activeInitiatives.find(i => i.id === id);
+    Store.set('selectedId', id);
+    const initiative = Store.get('initiatives').find(i => i.id === id);
     if (!initiative) return;
 
     switchView('steerco-scoring');
-
     const matrix = document.getElementById('steercoScoringMatrix');
+    if (!matrix) return;
     matrix.style.display = 'block';
 
-    // Auto-derive SC numeric score
     const sc = initiative.strategic_classification;
     let scNumeric = 5;
     if (sc) {
@@ -1033,28 +1588,19 @@ function calculateSteercoScore(id) {
     }
 
     const saved = initiative.steerco_scoring?.dimensions || {};
-    window._pendingSteercoScores = {
+    Store.set('pendingSteercoScores', new Map(Object.entries({
         ict_demand: saved.ict_demand || 5,
         effort: saved.effort || 5,
         system_readiness: scNumeric,
         cost: saved.cost || 5,
         likelihood_success: saved.likelihood_success || 5,
         resources: saved.resources || 5
-    };
-
-    const dimensions = [
-        { key: 'ict_demand', label: 'Type of ICT Demand', desc: 'Complexity of the ICT demand' },
-        { key: 'effort', label: 'Effort', desc: 'Estimated effort required' },
-        { key: 'system_readiness', label: 'System Readiness', desc: 'Most appropriate system option' },
-        { key: 'cost', label: 'Cost', desc: 'Financial cost impact' },
-        { key: 'likelihood_success', label: 'Likelihood of Success', desc: 'Probability of successful delivery' },
-        { key: 'resources', label: 'Resources', desc: 'Human Resources required' }
-    ];
+    })));
 
     let html = `
         <h3 style="margin-bottom:8px;">SteerCo Value & Ease Scoring Matrix</h3>
         <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:20px;">
-            Scoring: <strong>${initiative.name}</strong> | SC Score: <strong>${scNumeric}</strong>
+            Scoring: <strong>${escapeHtml(initiative.name)}</strong> | SC Score: <strong>${scNumeric}</strong>
         </p>
         <table class="classification-table">
             <thead>
@@ -1067,82 +1613,25 @@ function calculateSteercoScore(id) {
             <tbody>
     `;
 
-    dimensions.forEach(dim => {
-        const val = window._pendingSteercoScores[dim.key];
-
-        let optionsHtml = '';
-        if (dim.key === 'ict_demand') {
-            const ictOptions = [
-                { value: 1, label: 'Tactical Demand (1)' },
-                { value: 5, label: 'Operational Demand (5)' },
-                { value: 10, label: 'Strategic Demand (10)' }
-            ];
-            optionsHtml = ictOptions.map(o =>
-                `<option value="${o.value}" ${o.value === val ? 'selected' : ''}>${o.label}</option>`
-            ).join('');
-        } else if (dim.key === 'effort') {
-            const effortOptions = [
-                { value: 1, label: '> 6 months (1)' },
-                { value: 5, label: '> 2 months and \u2264 6 months (5)' },
-                { value: 10, label: '\u2264 2 months (10)' }
-            ];
-            optionsHtml = effortOptions.map(o =>
-                `<option value="${o.value}" ${o.value === val ? 'selected' : ''}>${o.label}</option>`
-            ).join('');
-        } else if (dim.key === 'system_readiness') {
-            const srOptions = [
-                { value: 1, label: 'Major custom dev required (1)' },
-                { value: 5, label: 'Minor custom dev required (5)' },
-                { value: 10, label: 'Off-The-Shelf system (10)' }
-            ];
-            optionsHtml = srOptions.map(o =>
-                `<option value="${o.value}" ${o.value === val ? 'selected' : ''}>${o.label}</option>`
-            ).join('');
-        } else if (dim.key === 'cost') {
-            const costOptions = [
-                { value: 1, label: '> R5m (1)' },
-                { value: 5, label: '> R1m and \u2264 R5m (5)' },
-                { value: 10, label: '\u2264 R1m (10)' }
-            ];
-            optionsHtml = costOptions.map(o =>
-                `<option value="${o.value}" ${o.value === val ? 'selected' : ''}>${o.label}</option>`
-            ).join('');
-        } else if (dim.key === 'likelihood_success') {
-            const lsOptions = [
-                { value: 1, label: 'Even odds (1)' },
-                { value: 5, label: 'Good odds (5)' },
-                { value: 10, label: 'Great odds (10)' }
-            ];
-            optionsHtml = lsOptions.map(o =>
-                `<option value="${o.value}" ${o.value === val ? 'selected' : ''}>${o.label}</option>`
-            ).join('');
-        } else if (dim.key === 'resources') {
-            const resOptions = [
-                { value: 1, label: '> 10 (1)' },
-                { value: 5, label: '> 6 and \u2264 10 (5)' },
-                { value: 10, label: '\u2264 6 (10)' }
-            ];
-            optionsHtml = resOptions.map(o =>
-                `<option value="${o.value}" ${o.value === val ? 'selected' : ''}>${o.label}</option>`
-            ).join('');
-        }
+    STEERCO_DIMENSIONS.forEach(dim => {
+        const val = Store.get('pendingSteercoScores').get(dim.key);
+        const options = STEERCO_OPTIONS[dim.key];
 
         html += `
             <tr>
-                <td><strong>${dim.label}</strong></td>
-                <td style="font-size:0.85rem;color:var(--text-secondary);">${dim.desc}</td>
+                <td><strong>${escapeHtml(dim.label)}</strong></td>
+                <td style="font-size:0.85rem;color:var(--text-secondary);">${escapeHtml(dim.desc)}</td>
                 <td>
                     <select class="sc-score-select" onchange="updateSteercoScore('${dim.key}', this.value)">
-                        ${optionsHtml}
+                        ${options.map(o => `<option value="${o.value}" ${o.value === val ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
                     </select>
                 </td>
             </tr>
         `;
     });
 
-    const value = scNumeric + (window._pendingSteercoScores.ict_demand || 5);
-    const sumEase = ['effort', 'system_readiness', 'cost', 'likelihood_success', 'resources']
-        .reduce((sum, k) => sum + (window._pendingSteercoScores[k] || 0), 0);
+    const value = calculateSteercoValue(scNumeric, Store.get('pendingSteercoScores').get('ict_demand') || 5);
+    const ease = calculateSteercoEase(Object.fromEntries(Store.get('pendingSteercoScores')));
 
     html += `
             </tbody>
@@ -1150,17 +1639,17 @@ function calculateSteercoScore(id) {
                 <tr>
                     <td><strong>Value (SC + ICT Demand)</strong></td>
                     <td></td>
-                    <td id="steercoValueCell">${value.toFixed(1)}</td>
+                    <td id="steercoValueCell">${formatNumber(value)}</td>
                 </tr>
                 <tr>
                     <td><strong>Ease (Sum of 5 dimensions)</strong></td>
                     <td></td>
-                    <td id="steercoEaseCell">${sumEase.toFixed(1)}</td>
+                    <td id="steercoEaseCell">${formatNumber(ease)}</td>
                 </tr>
             </tfoot>
         </table>
         <div style="margin-top:20px;display:flex;gap:12px;">
-            <button class="action-btn" onclick="submitSteercoScoring('${id}')">Save SteerCo Scores</button>
+            <button class="action-btn" onclick="submitSteercoScoring()">Save SteerCo Scores</button>
         </div>
     `;
 
@@ -1168,9 +1657,11 @@ function calculateSteercoScore(id) {
 }
 
 function updateSteercoScore(key, value) {
-    window._pendingSteercoScores[key] = parseInt(value);
+    const scores = Store.get('pendingSteercoScores');
+    scores.set(key, parseInt(value));
+    Store.set('pendingSteercoScores', scores);
 
-    const initiative = activeInitiatives.find(i => i.id === selectedInitiativeId);
+    const initiative = Store.get('initiatives').find(i => i.id === Store.get('selectedId'));
     const sc = initiative?.strategic_classification;
     let scNumeric = 5;
     if (sc) {
@@ -1179,16 +1670,18 @@ function updateSteercoScore(key, value) {
         else scNumeric = 1;
     }
 
-    const valueScore = scNumeric + (window._pendingSteercoScores.ict_demand || 5);
-    const sumEase = ['effort', 'system_readiness', 'cost', 'likelihood_success', 'resources']
-        .reduce((sum, k) => sum + (window._pendingSteercoScores[k] || 0), 0);
+    const valueScore = calculateSteercoValue(scNumeric, scores.get('ict_demand') || 5);
+    const easeScore = calculateSteercoEase(Object.fromEntries(scores));
 
-    document.getElementById('steercoValueCell').innerText = valueScore.toFixed(1);
-    document.getElementById('steercoEaseCell').innerText = sumEase.toFixed(1);
+    const valueCell = document.getElementById('steercoValueCell');
+    const easeCell = document.getElementById('steercoEaseCell');
+    if (valueCell) valueCell.innerText = formatNumber(valueScore);
+    if (easeCell) easeCell.innerText = formatNumber(easeScore);
 }
 
-async function submitSteercoScoring(id) {
-    const sc = activeInitiatives.find(i => i.id === id)?.strategic_classification;
+async function submitSteercoScoring() {
+    const id = Store.get('selectedId');
+    const sc = Store.get('initiatives').find(i => i.id === id)?.strategic_classification;
     let scNumeric = 5;
     if (sc) {
         if (sc.total_weighted_score >= 75) scNumeric = 10;
@@ -1196,67 +1689,825 @@ async function submitSteercoScoring(id) {
         else scNumeric = 1;
     }
 
+    const scores = Store.get('pendingSteercoScores');
     const payload = {
         strategic_classification_score: scNumeric,
-        ict_demand: window._pendingSteercoScores.ict_demand || 5,
-        effort: window._pendingSteercoScores.effort || 5,
-        system_readiness: window._pendingSteercoScores.system_readiness || scNumeric,
-        cost: window._pendingSteercoScores.cost || 5,
-        likelihood_success: window._pendingSteercoScores.likelihood_success || 5,
-        resources: window._pendingSteercoScores.resources || 5
+        ict_demand: scores.get('ict_demand') || 5,
+        effort: scores.get('effort') || 5,
+        system_readiness: scores.get('system_readiness') || scNumeric,
+        cost: scores.get('cost') || 5,
+        likelihood_success: scores.get('likelihood_success') || 5,
+        resources: scores.get('resources') || 5
     };
 
+    setLoading(true);
     try {
-        const response = await fetch(`${API_BASE}/initiatives/${id}/steerco-scoring`, {
+        const response = await apiRequest(`/initiatives/${id}/steerco-scoring`, {
             method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(payload)
+            body: payload
         });
-        const resData = await response.json();
-        showToast(resData.message);
-        if (resData.success) {
-            loadAllInitiatives();
+        showToast(response.message, response.success ? 'success' : 'warning');
+        if (response.success) {
+            await loadAllInitiatives();
             renderSteercoScoringList();
         }
     } catch (e) {
-        const value = scNumeric + payload.ict_demand;
-        const ease = ['effort', 'system_readiness', 'cost', 'likelihood_success', 'resources']
-            .reduce((sum, k) => sum + payload[k], 0);
+        const value = calculateSteercoValue(scNumeric, payload.ict_demand);
+        const ease = calculateSteercoEase(payload);
 
-        showToast("Offline: SteerCo scores saved locally.");
-        const idx = activeInitiatives.findIndex(i => i.id === id);
+        showToast("Offline: SteerCo scores saved locally.", 'warning');
+        const initiatives = Store.get('initiatives');
+        const idx = initiatives.findIndex(i => i.id === id);
         if (idx !== -1) {
-            activeInitiatives[idx].steerco_scoring = {
-                value,
-                ease,
-                dimensions: payload,
-                scoring_date: new Date().toISOString()
+            initiatives[idx] = {
+                ...initiatives[idx],
+                steerco_scoring: {
+                    value,
+                    ease,
+                    dimensions: payload,
+                    scoring_date: new Date().toISOString()
+                }
             };
+            Store.set('initiatives', initiatives);
         }
+    } finally {
+        setLoading(false);
     }
 }
 
-// -------------------------------------------------------------
-// UC8: EXECUTIVE REPORTING ENGINE (Power BI Simulator)
-// -------------------------------------------------------------
+// ============================================================
+// EXECUTIVE REPORTING ENGINE
+// ============================================================
+
 function renderReports() {
     const tableBody = document.querySelector('#reportTable tbody');
+    if (!tableBody) return;
+
     tableBody.innerHTML = '';
+    const initiatives = Store.get('initiatives');
 
     let totalVal = 0;
-    activeInitiatives.forEach(init => {
+    const fragment = document.createDocumentFragment();
+
+    initiatives.forEach(init => {
         totalVal += init.budget_estimate;
-        tableBody.innerHTML += `
-            <tr style="border-bottom: 1px solid var(--border);">
-                <td style="padding: 12px; font-weight:600;">${init.request_number}</td>
-                <td style="padding: 12px;">${init.name}</td>
-                <td style="padding: 12px;">${init.requester_name}</td>
-                <td style="padding: 12px; font-size:0.8rem; color:var(--text-secondary);">${init.alignment_strategy.split(':')[0]}</td>
-                <td style="padding: 12px;"><span class="badge ${init.status}">${init.status}</span></td>
-                <td style="padding: 12px; font-weight:600; text-align:right;">R ${init.budget_estimate.toLocaleString()}</td>
-            </tr>
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid var(--border)';
+        tr.innerHTML = `
+            <td style="padding: 12px; font-weight:600;">${escapeHtml(init.request_number)}</td>
+            <td style="padding: 12px;">${escapeHtml(init.name)}</td>
+            <td style="padding: 12px;">${escapeHtml(init.requester_name)}</td>
+            <td style="padding: 12px; font-size:0.8rem; color:var(--text-secondary);">${escapeHtml(init.alignment_strategy.split(':')[0])}</td>
+            <td style="padding: 12px;"><span class="badge ${escapeHtml(init.status)}">${escapeHtml(init.status)}</span></td>
+            <td style="padding: 12px; font-weight:600; text-align:right;">${formatCurrency(init.budget_estimate)}</td>
         `;
+        fragment.appendChild(tr);
     });
 
-    document.getElementById('reportValue').innerText = `R ${totalVal.toLocaleString()}`;
+    tableBody.appendChild(fragment);
+
+    const reportValue = document.getElementById('reportValue');
+    if (reportValue) reportValue.innerText = formatCurrency(totalVal);
 }
+
+// ============================================================
+// LIFE CYCLE INITIALIZER
+// ============================================================
+window.onload = function() {
+    changePersona();
+    populateCapTypes();
+    loadAllInitiatives();
+};
+
+// ============================================================
+// SHAREPOINT DOCUMENT INTEGRATION MODULE (Option B)
+// Microsoft Graph API + Deep Link Upload
+// ============================================================
+
+const SHAREPOINT_CONFIG = {
+    siteUrl: window.IDM_CONFIG?.SHAREPOINT_SITE || 'https://unisa.sharepoint.com/sites/IDMF',
+    siteId: window.IDM_CONFIG?.SHAREPOINT_SITE_ID || 'unisa.sharepoint.com,12345678-1234-1234-1234-123456789012,abcdef12-3456-7890-abcd-ef1234567890',
+    driveId: window.IDM_CONFIG?.SHAREPOINT_DRIVE_ID || 'b!abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ12',
+    documentLibraries: {
+        businessCases: '/BusinessCases',
+        solarchReports: '/SolArchReports',
+        strategicClassifications: '/StrategicClassifications',
+        steercoPacks: '/SteerCoPacks'
+    },
+    pollingInterval: 30000, // 30 seconds
+    maxFileSize: 50 * 1024 * 1024, // 50MB
+    allowedTypes: ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt']
+};
+
+// ============================================================
+// MICROSOFT GRAPH API CLIENT
+// ============================================================
+
+class SharePointClient {
+    constructor() {
+        this.accessToken = null;
+        this.tokenExpiry = null;
+    }
+
+    async getToken() {
+        // In production, this would use MSAL.js for silent token acquisition
+        // For demo/development, check if we have a valid token
+        if (this.accessToken && this.tokenExpiry && Date.now() < this.tokenExpiry) {
+            return this.accessToken;
+        }
+
+        // Attempt to get token from backend (token exchange pattern)
+        try {
+            const response = await apiRequest('/auth/sharepoint-token');
+            if (response.success) {
+                this.accessToken = response.token;
+                this.tokenExpiry = Date.now() + (response.expiresIn * 1000);
+                return this.accessToken;
+            }
+        } catch (e) {
+            console.warn('SharePoint token unavailable, using demo mode');
+        }
+
+        return null;
+    }
+
+    async makeGraphRequest(endpoint, options = {}) {
+        const token = await this.getToken();
+        if (!token) {
+            throw new Error('SharePoint authentication required');
+        }
+
+        const url = `https://graph.microsoft.com/v1.0${endpoint}`;
+        const response = await fetch(url, {
+            ...options,
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error?.message || `Graph API error: ${response.status}`);
+        }
+
+        return response.json();
+    }
+
+    // Get or create folder for initiative
+    async ensureInitiativeFolder(initiativeId, documentType) {
+        const libraryPath = SHAREPOINT_CONFIG.documentLibraries[documentType];
+        const folderPath = `${libraryPath}/${initiativeId}`;
+
+        try {
+            // Try to get folder
+            return await this.makeGraphRequest(
+                `/sites/${SHAREPOINT_CONFIG.siteId}/drive/root:${folderPath}`
+            );
+        } catch (e) {
+            // Folder doesn't exist, create it
+            return await this.makeGraphRequest(
+                `/sites/${SHAREPOINT_CONFIG.siteId}/drive/root:${libraryPath}:/children`,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        name: initiativeId,
+                        folder: {},
+                        '@microsoft.graph.conflictBehavior': 'fail'
+                    })
+                }
+            );
+        }
+    }
+
+    // List documents in initiative folder
+    async listDocuments(initiativeId, documentType) {
+        const libraryPath = SHAREPOINT_CONFIG.documentLibraries[documentType];
+        const folderPath = `${libraryPath}/${initiativeId}`;
+
+        try {
+            const result = await this.makeGraphRequest(
+                `/sites/${SHAREPOINT_CONFIG.siteId}/drive/root:${folderPath}:/children`
+            );
+            return result.value || [];
+        } catch (e) {
+            return []; // Folder may not exist yet
+        }
+    }
+
+    // Get document download URL
+    async getDocumentUrl(itemId) {
+        const result = await this.makeGraphRequest(
+            `/sites/${SHAREPOINT_CONFIG.siteId}/drive/items/${itemId}`
+        );
+        return result.webUrl || result['@microsoft.graph.downloadUrl'];
+    }
+
+    // Delete document
+    async deleteDocument(itemId) {
+        await this.makeGraphRequest(
+            `/sites/${SHAREPOINT_CONFIG.siteId}/drive/items/${itemId}`,
+            { method: 'DELETE' }
+        );
+    }
+}
+
+// Global SharePoint client instance
+const spClient = new SharePointClient();
+
+// ============================================================
+// DOCUMENT STATUS POLLING & SYNC
+// ============================================================
+
+class DocumentSyncManager {
+    constructor() {
+        this.pollingTimers = new Map();
+        this.lastKnownDocuments = new Map();
+    }
+
+    startPolling(initiativeId) {
+        this.stopPolling(initiativeId);
+
+        // Immediate first sync
+        this.syncDocuments(initiativeId);
+
+        // Set up interval
+        const timer = setInterval(() => {
+            this.syncDocuments(initiativeId);
+        }, SHAREPOINT_CONFIG.pollingInterval);
+
+        this.pollingTimers.set(initiativeId, timer);
+    }
+
+    stopPolling(initiativeId) {
+        const timer = this.pollingTimers.get(initiativeId);
+        if (timer) {
+            clearInterval(timer);
+            this.pollingTimers.delete(initiativeId);
+        }
+    }
+
+    stopAllPolling() {
+        this.pollingTimers.forEach(timer => clearInterval(timer));
+        this.pollingTimers.clear();
+    }
+
+    async syncDocuments(initiativeId) {
+        const initiative = Store.get('initiatives').find(i => i.id === initiativeId);
+        if (!initiative) return;
+
+        try {
+            const documentTypes = ['businessCases', 'solarchReports', 'strategicClassifications', 'steercoPacks'];
+            const updates = {};
+
+            for (const docType of documentTypes) {
+                const documents = await spClient.listDocuments(initiativeId, docType);
+                const key = this.getStatusKey(docType);
+
+                // Check if documents exist vs. previous state
+                const previous = this.lastKnownDocuments.get(`${initiativeId}-${docType}`) || [];
+                const hasNewDocuments = documents.length > 0;
+                const hadDocuments = previous.length > 0;
+
+                if (hasNewDocuments !== hadDocuments || documents.length !== previous.length) {
+                    updates[key] = hasNewDocuments ? 'Signed-Fully' : 'In-Progress';
+                    this.lastKnownDocuments.set(`${initiativeId}-${docType}`, documents);
+                }
+
+                // Store document metadata for UI
+                Store.update('documentMetadata', (current = {}) => {
+                    const updated = { ...current };
+                    if (!updated[initiativeId]) updated[initiativeId] = {};
+                    updated[initiativeId][docType] = documents.map(doc => ({
+                        id: doc.id,
+                        name: doc.name,
+                        size: doc.size,
+                        createdDateTime: doc.createdDateTime,
+                        lastModifiedDateTime: doc.lastModifiedDateTime,
+                        webUrl: doc.webUrl,
+                        createdBy: doc.createdBy?.user?.displayName,
+                        downloadUrl: doc['@microsoft.graph.downloadUrl']
+                    }));
+                    return updated;
+                });
+            }
+
+            // Update initiative status if documents changed
+            if (Object.keys(updates).length > 0) {
+                const initiatives = Store.get('initiatives');
+                const idx = initiatives.findIndex(i => i.id === initiativeId);
+                if (idx !== -1) {
+                    initiatives[idx] = { ...initiatives[idx], ...updates };
+                    Store.set('initiatives', initiatives);
+
+                    // Refresh UI if viewing this initiative
+                    if (Store.get('selectedId') === initiativeId) {
+                        renderDocumentationLinks(initiatives[idx]);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Document sync failed:', e);
+        }
+    }
+
+    getStatusKey(docType) {
+        const mapping = {
+            businessCases: 'business_case_status',
+            solarchReports: 'solarch_report_status',
+            strategicClassifications: 'strategic_classification_status',
+            steercoPacks: 'steerco_pack_status'
+        };
+        return mapping[docType];
+    }
+}
+
+const documentSync = new DocumentSyncManager();
+
+// ============================================================
+// SHAREPOINT DEEP LINK UPLOAD
+// ============================================================
+
+/**
+ * Generate SharePoint deep link for document upload
+ * Opens SharePoint in a modal-friendly window with pre-populated metadata
+ */
+function openSharePointUpload(initiativeId, documentType, initiativeName) {
+    const libraryPath = SHAREPOINT_CONFIG.documentLibraries[documentType];
+    const folderPath = `${libraryPath}/${initiativeId}`;
+
+    // Build SharePoint upload URL with metadata
+    const params = new URLSearchParams({
+        'List': SHAREPOINT_CONFIG.driveId,
+        'RootFolder': folderPath,
+        'Metadata_InitiativeID': initiativeId,
+        'Metadata_InitiativeName': initiativeName,
+        'Metadata_DocumentType': documentType,
+        'Metadata_UploadedBy': Store.get('persona').email,
+        'Metadata_UploadDate': new Date().toISOString()
+    });
+
+    const uploadUrl = `${SHAREPOINT_CONFIG.siteUrl}/_layouts/15/Upload.aspx?${params.toString()}`;
+
+    // Open in centered popup
+    const width = 1000;
+    const height = 700;
+    const left = (window.screen.width - width) / 2;
+    const top = (window.screen.height - height) / 2;
+
+    const popup = window.open(
+        uploadUrl,
+        'sharepointUpload',
+        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=yes`
+    );
+
+    // Monitor popup closure to trigger sync
+    const checkClosed = setInterval(() => {
+        if (popup.closed) {
+            clearInterval(checkClosed);
+            showToast('Document upload window closed. Syncing...', 'info');
+            documentSync.syncDocuments(initiativeId);
+        }
+    }, 1000);
+
+    // Start polling for changes
+    documentSync.startPolling(initiativeId);
+
+    return popup;
+}
+
+/**
+ * Alternative: Direct browser upload via Graph API (large files)
+ * Uses resumable upload session for files > 4MB
+ */
+async function uploadDocumentDirectly(file, initiativeId, documentType) {
+    // Validate file
+    if (file.size > SHAREPOINT_CONFIG.maxFileSize) {
+        throw new ValidationError(`File exceeds ${SHAREPOINT_CONFIG.maxFileSize / 1024 / 1024}MB limit`);
+    }
+
+    const ext = '.' + file.name.split('.').pop().toLowerCase();
+    if (!SHAREPOINT_CONFIG.allowedTypes.includes(ext)) {
+        throw new ValidationError(`File type ${ext} not allowed. Accepted: ${SHAREPOINT_CONFIG.allowedTypes.join(', ')}`);
+    }
+
+    setLoading(true);
+    try {
+        // Ensure folder exists
+        await spClient.ensureInitiativeFolder(initiativeId, documentType);
+
+        const libraryPath = SHAREPOINT_CONFIG.documentLibraries[documentType];
+        const filePath = `${libraryPath}/${initiativeId}/${file.name}`;
+
+        let uploadResult;
+
+        if (file.size < 4 * 1024 * 1024) {
+            // Simple upload for small files
+            uploadResult = await spClient.makeGraphRequest(
+                `/sites/${SHAREPOINT_CONFIG.siteId}/drive/root:${filePath}:/content`,
+                {
+                    method: 'PUT',
+                    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+                    body: file
+                }
+            );
+        } else {
+            // Resumable upload for large files
+            uploadResult = await uploadLargeFile(file, filePath);
+        }
+
+        // Update metadata
+        await spClient.makeGraphRequest(
+            `/sites/${SHAREPOINT_CONFIG.siteId}/drive/items/${uploadResult.id}`,
+            {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    fields: {
+                        InitiativeID: initiativeId,
+                        DocumentType: documentType,
+                        UploadedBy: Store.get('persona').email
+                    }
+                })
+            }
+        );
+
+        showToast(`Document "${file.name}" uploaded successfully`, 'success');
+
+        // Trigger sync
+        await documentSync.syncDocuments(initiativeId);
+
+        return uploadResult;
+    } finally {
+        setLoading(false);
+    }
+}
+
+async function uploadLargeFile(file, filePath) {
+    // Create upload session
+    const session = await spClient.makeGraphRequest(
+        `/sites/${SHAREPOINT_CONFIG.siteId}/drive/root:${filePath}:/createUploadSession`,
+        {
+            method: 'POST',
+            body: JSON.stringify({
+                item: {
+                    '@microsoft.graph.conflictBehavior': 'replace',
+                    name: file.name
+                }
+            })
+        }
+    );
+
+    // Upload in chunks
+    const chunkSize = 320 * 1024; // 320KB chunks
+    let start = 0;
+    let uploadResult;
+
+    while (start < file.size) {
+        const end = Math.min(start + chunkSize, file.size);
+        const chunk = file.slice(start, end);
+
+        const response = await fetch(session.uploadUrl, {
+            method: 'PUT',
+            headers: {
+                'Content-Length': chunk.size,
+                'Content-Range': `bytes ${start}-${end - 1}/${file.size}`
+            },
+            body: chunk
+        });
+
+        if (!response.ok && response.status !== 308) {
+            throw new Error('Upload chunk failed');
+        }
+
+        if (end === file.size) {
+            uploadResult = await response.json();
+        }
+
+        start = end;
+    }
+
+    return uploadResult;
+}
+
+// ============================================================
+// DOCUMENT RENDERING (Enhanced)
+// ============================================================
+
+function renderDocumentationLinks(initiative) {
+    const docs = document.getElementById('detailExtraDocs');
+    if (!docs) return;
+
+    docs.style.display = 'none';
+
+    if (initiative.status !== 'Submitted' && initiative.status !== 'Accepted') {
+        docs.style.display = 'flex';
+
+        renderBusinessCaseSection(initiative);
+        renderSolArchSection(initiative);
+        renderStrategicClassSection(initiative);
+        renderSteerCoPackSection(initiative);
+    }
+
+    // Start polling when viewing detail
+    documentSync.startPolling(initiative.id);
+}
+
+function renderBusinessCaseSection(initiative) {
+    const container = document.getElementById('businessCaseLink');
+    if (!container) return;
+
+    const metadata = Store.get('documentMetadata')?.[initiative.id]?.businessCases || [];
+    const hasDocuments = metadata.length > 0;
+    const status = hasDocuments ? 'Signed-Fully' : (initiative.business_case_status || 'In-Progress');
+
+    let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span>Business Case Status: <strong>${escapeHtml(status)}</strong></span>`;
+
+    // Upload button for authorized roles
+    const persona = Store.get('persona');
+    if (['Initiative Owner', 'Demand Planner', 'Solutions Architect'].includes(persona.role)) {
+        html += `<button class="action-btn" style="padding:6px 12px;font-size:0.8rem;" 
+            onclick="openDocumentUpload('${initiative.id}', 'businessCases', '${escapeHtml(initiative.name)}')">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16m8-8H4"/></svg>
+            Upload
+        </button>`;
+    }
+
+    html += `</div>`;
+
+    // Document list
+    if (hasDocuments) {
+        html += `<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">`;
+        metadata.forEach(doc => {
+            html += renderDocumentItem(doc, initiative.id, 'businessCases');
+        });
+        html += `</div>`;
+    } else {
+        html += `<small style="color:var(--text-secondary);">No documents uploaded yet. Click Upload to add via SharePoint.</small>`;
+    }
+
+    container.innerHTML = html;
+}
+
+function renderSolArchSection(initiative) {
+    const container = document.getElementById('solarchReportLink');
+    if (!container) return;
+
+    const metadata = Store.get('documentMetadata')?.[initiative.id]?.solarchReports || [];
+    const hasDocuments = metadata.length > 0;
+    const status = hasDocuments ? 'Completed' : (initiative.solarch_report_status || 'In-Progress');
+
+    let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span>SolArch Assessment Report: <strong>${escapeHtml(status)}</strong></span>`;
+
+    const persona = Store.get('persona');
+    if (persona.role === 'Solutions Architect') {
+        html += `<button class="action-btn" style="padding:6px 12px;font-size:0.8rem;" 
+            onclick="openDocumentUpload('${initiative.id}', 'solarchReports', '${escapeHtml(initiative.name)}')">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16m8-8H4"/></svg>
+            Upload Report
+        </button>`;
+    }
+
+    html += `</div>`;
+
+    if (hasDocuments) {
+        html += `<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">`;
+        metadata.forEach(doc => {
+            html += renderDocumentItem(doc, initiative.id, 'solarchReports');
+        });
+        html += `</div>`;
+    } else {
+        html += `<small style="color:var(--text-secondary);">No SolArch report uploaded yet.</small>`;
+    }
+
+    container.innerHTML = html;
+}
+
+function renderStrategicClassSection(initiative) {
+    const container = document.getElementById('strategicClassLink');
+    if (!container) return;
+
+    const metadata = Store.get('documentMetadata')?.[initiative.id]?.strategicClassifications || [];
+    const hasDocuments = metadata.length > 0;
+
+    container.style.display = initiative.strategic_classification ? 'block' : 'none';
+    if (!initiative.strategic_classification) return;
+
+    let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <strong>Strategic Classification:</strong>`;
+
+    const persona = Store.get('persona');
+    if (['Demand Planner', 'Solutions Architect'].includes(persona.role)) {
+        html += `<button class="action-btn" style="padding:6px 12px;font-size:0.8rem;" 
+            onclick="openDocumentUpload('${initiative.id}', 'strategicClassifications', '${escapeHtml(initiative.name)}')">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16m8-8H4"/></svg>
+            Attach Evidence
+        </button>`;
+    }
+
+    html += `</div>`;
+    html += `Total Score: <strong>${formatNumber(initiative.strategic_classification.total_weighted_score)}</strong> | 
+             Category: <strong>${escapeHtml(initiative.strategic_classification.category)}</strong>`;
+
+    if (hasDocuments) {
+        html += `<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">`;
+        metadata.forEach(doc => {
+            html += renderDocumentItem(doc, initiative.id, 'strategicClassifications');
+        });
+        html += `</div>`;
+    }
+
+    container.innerHTML = html;
+}
+
+function renderSteerCoPackSection(initiative) {
+    // Check if steerco pack section exists, create if not
+    let container = document.getElementById('steercoPackLink');
+    if (!container) {
+        const docsContainer = document.getElementById('detailExtraDocs');
+        if (docsContainer) {
+            container = document.createElement('div');
+            container.id = 'steercoPackLink';
+            container.style.cssText = 'padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; font-size: 0.85rem;';
+            docsContainer.appendChild(container);
+        }
+    }
+    if (!container) return;
+
+    const metadata = Store.get('documentMetadata')?.[initiative.id]?.steercoPacks || [];
+    const hasDocuments = metadata.length > 0;
+
+    let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <strong>SteerCo Pack:</strong>`;
+
+    const persona = Store.get('persona');
+    if (persona.role === 'ICT SteerCo Secretariat') {
+        html += `<button class="action-btn" style="padding:6px 12px;font-size:0.8rem;" 
+            onclick="openDocumentUpload('${initiative.id}', 'steercoPacks', '${escapeHtml(initiative.name)}')">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16m8-8H4"/></svg>
+            Upload Pack
+        </button>`;
+    }
+
+    html += `</div>`;
+
+    if (hasDocuments) {
+        html += `<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">`;
+        metadata.forEach(doc => {
+            html += renderDocumentItem(doc, initiative.id, 'steercoPacks');
+        });
+        html += `</div>`;
+    } else {
+        html += `<small style="color:var(--text-secondary);">No SteerCo pack uploaded yet.</small>`;
+    }
+
+    container.innerHTML = html;
+}
+
+function renderDocumentItem(doc, initiativeId, docType) {
+    const sizeFormatted = formatFileSize(doc.size);
+    const dateFormatted = formatDate(doc.lastModifiedDateTime);
+
+    return `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(255,255,255,0.05);border-radius:6px;">
+            <div style="display:flex;align-items:center;gap:8px;overflow:hidden;">
+                <span style="font-size:1.2rem;">📄</span>
+                <div style="overflow:hidden;">
+                    <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(doc.name)}</div>
+                    <div style="font-size:0.75rem;color:var(--text-secondary);">${sizeFormatted} • ${dateFormatted} • ${escapeHtml(doc.createdBy || 'Unknown')}</div>
+                </div>
+            </div>
+            <div style="display:flex;gap:6px;flex-shrink:0;">
+                <a href="${escapeHtml(doc.webUrl)}" target="_blank" rel="noopener" 
+                   class="action-btn" style="padding:4px 10px;font-size:0.75rem;text-decoration:none;"
+                   title="Open in SharePoint">
+                    Open
+                </a>
+                ${doc.downloadUrl ? `
+                <a href="${escapeHtml(doc.downloadUrl)}" download 
+                   class="action-btn" style="padding:4px 10px;font-size:0.75rem;text-decoration:none;background:var(--success);"
+                   title="Download">
+                    ⬇
+                </a>` : ''}
+                <button onclick="deleteDocument('${doc.id}', '${initiativeId}', '${docType}')" 
+                        class="action-btn" style="padding:4px 10px;font-size:0.75rem;background:var(--danger);"
+                        title="Delete">
+                    🗑
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+// ============================================================
+// DOCUMENT UPLOAD INTERFACE
+// ============================================================
+
+function openDocumentUpload(initiativeId, documentType, initiativeName) {
+    // Check if we have Graph API access
+    const hasGraphAccess = !!sessionStorage.getItem('idm_token');
+
+    if (hasGraphAccess) {
+        // Show upload method choice
+        showUploadMethodDialog(initiativeId, documentType, initiativeName);
+    } else {
+        // Fallback to SharePoint deep link
+        openSharePointUpload(initiativeId, documentType, initiativeName);
+    }
+}
+
+function showUploadMethodDialog(initiativeId, documentType, initiativeName) {
+    const existing = document.querySelector('.upload-method-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'upload-method-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:10002;animation:fadeIn 0.2s ease-out;';
+    overlay.innerHTML = `
+        <div style="background:#ffffff;border-radius:16px;padding:32px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.2);text-align:center;animation:toastSlide 0.3s ease-out;">
+            <div style="font-size:2.5rem;margin-bottom:12px;">📤</div>
+            <h3 style="margin-bottom:8px;">Upload Document</h3>
+            <p style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:24px;">
+                Choose how you want to upload documents for <strong>${escapeHtml(initiativeName)}</strong>
+            </p>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+                <button class="action-btn" onclick="this.closest('.upload-method-overlay').remove(); openDirectUpload('${initiativeId}', '${documentType}');" style="justify-content:center;">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16m8-8H4"/></svg>
+                    Upload Directly (Fast)
+                </button>
+                <button class="action-btn" onclick="this.closest('.upload-method-overlay').remove(); openSharePointUpload('${initiativeId}', '${documentType}', '${escapeHtml(initiativeName)}');" style="justify-content:center;background:var(--accent-hover);">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                    Open in SharePoint
+                </button>
+                <button class="action-btn" onclick="this.closest('.upload-method-overlay').remove();" style="justify-content:center;background:rgba(255,255,255,0.05);color:var(--text-primary);">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+function openDirectUpload(initiativeId, documentType) {
+    // Create hidden file input
+    let input = document.getElementById('directUploadInput');
+    if (!input) {
+        input = document.createElement('input');
+        input.type = 'file';
+        input.id = 'directUploadInput';
+        input.style.display = 'none';
+        input.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            try {
+                await uploadDocumentDirectly(file, initiativeId, documentType);
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+            input.value = ''; // Reset
+        });
+        document.body.appendChild(input);
+    }
+
+    input.accept = SHAREPOINT_CONFIG.allowedTypes.join(',');
+    input.click();
+}
+
+async function deleteDocument(docId, initiativeId, docType) {
+    const confirmed = await showConfirmDialog('Are you sure you want to delete this document? This action cannot be undone.');
+    if (!confirmed) return;
+
+    setLoading(true);
+    try {
+        await spClient.deleteDocument(docId);
+        showToast('Document deleted successfully', 'success');
+        await documentSync.syncDocuments(initiativeId);
+    } catch (e) {
+        showToast('Failed to delete document: ' + e.message, 'error');
+    } finally {
+        setLoading(false);
+    }
+}
+
+// ============================================================
+// CLEANUP ON VIEW CHANGE
+// ============================================================
+
+// Override switchView to stop polling when leaving detail view
+const originalSwitchView = switchView;
+switchView = function(viewId) {
+    if (viewId !== 'initiative-detail') {
+        documentSync.stopAllPolling();
+    }
+    return originalSwitchView(viewId);
+};
