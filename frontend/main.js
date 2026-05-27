@@ -1079,7 +1079,7 @@ function renderActionWorkstation(init) {
     container.innerHTML = '';
 
     if (init.status === 'Approved' || init.status === 'Declined') {
-        container.innerHTML = `<p style="color:var(--text-secondary)">This initiative has concluded in state <strong>${escapeHtml(init.status)}</strong>. Workstation locked.</p>`;
+        container.innerHTML = `<p style="color:var(--text-secondary)">This initiative is <strong>${escapeHtml(init.status)}</strong>.</p>`;
         return;
     }
 
@@ -1774,6 +1774,140 @@ function renderReports() {
 
     const reportValue = document.getElementById('reportValue');
     if (reportValue) reportValue.innerText = formatCurrency(totalVal);
+
+    drawValueEaseChart(initiatives);
+}
+
+function drawValueEaseChart(initiatives) {
+    const canvas = document.getElementById('valueEaseChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    const approved = initiatives.filter(i => i.status === 'Approved' && i.steerco_scoring);
+    if (approved.length === 0) {
+        ctx.fillStyle = '#475569';
+        ctx.font = '16px Outfit, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('No approved initiatives with SteerCo scoring data.', W / 2, H / 2);
+        return;
+    }
+
+    const pad = { top: 40, right: 30, bottom: 50, left: 60 };
+    const plotW = W - pad.left - pad.right;
+    const plotH = H - pad.top - pad.bottom;
+
+    const xMin = 0, xMax = 55, yMin = 0, yMax = 22;
+    const xScale = plotW / (xMax - xMin);
+    const yScale = plotH / (yMax - yMin);
+
+    function toX(v) { return pad.left + (v - xMin) * xScale; }
+    function toY(v) { return pad.top + plotH - (v - yMin) * yScale; }
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(100,116,139,0.15)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= 50; x += 10) {
+        ctx.beginPath();
+        ctx.moveTo(toX(x), pad.top);
+        ctx.lineTo(toX(x), pad.top + plotH);
+        ctx.stroke();
+    }
+    for (let y = 0; y <= 20; y += 5) {
+        ctx.beginPath();
+        ctx.moveTo(pad.left, toY(y));
+        ctx.lineTo(pad.left + plotW, toY(y));
+        ctx.stroke();
+    }
+
+    // Axes
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, pad.top);
+    ctx.lineTo(pad.left, pad.top + plotH);
+    ctx.lineTo(pad.left + plotW, pad.top + plotH);
+    ctx.stroke();
+
+    // Axis labels
+    ctx.fillStyle = '#0f172a';
+    ctx.font = '14px Outfit, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Ease', W / 2, H - 8);
+    ctx.save();
+    ctx.translate(14, pad.top + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('Value', 0, 0);
+    ctx.restore();
+
+    // Tick labels
+    ctx.fillStyle = '#475569';
+    ctx.font = '11px Outfit, sans-serif';
+    ctx.textAlign = 'center';
+    for (let x = 0; x <= 50; x += 10) {
+        ctx.fillText(x, toX(x), pad.top + plotH + 18);
+    }
+    ctx.textAlign = 'right';
+    for (let y = 0; y <= 20; y += 5) {
+        ctx.fillText(y, pad.left - 8, toY(y) + 4);
+    }
+
+    // Quadrant zones (low/med/high labeled)
+    ctx.fillStyle = 'rgba(16,185,129,0.06)';
+    ctx.fillRect(toX(30), toY(10), plotW / 2, plotH / 2);
+    ctx.fillStyle = 'rgba(245,158,11,0.06)';
+    ctx.fillRect(pad.left, toY(10), plotW / 2, plotH / 2);
+    ctx.fillStyle = 'rgba(239,68,68,0.06)';
+    ctx.fillRect(pad.left, pad.top, plotW / 2, plotH / 2);
+    ctx.fillStyle = 'rgba(245,158,11,0.06)';
+    ctx.fillRect(toX(30), pad.top, plotW / 2, plotH / 2);
+
+    ctx.font = '10px Outfit, sans-serif';
+    ctx.fillStyle = 'rgba(100,116,139,0.4)';
+    ctx.textAlign = 'center';
+    ctx.fillText('HIGH EASE / LOW VALUE', toX(42.5), toY(16));
+    ctx.fillText('HIGH EASE / HIGH VALUE', toX(42.5), toY(4));
+    ctx.fillText('LOW EASE / LOW VALUE', toX(15), toY(16));
+    ctx.fillText('LOW EASE / HIGH VALUE', toX(15), toY(4));
+
+    // Plot points
+    const colors = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+    approved.forEach((init, i) => {
+        const v = init.steerco_scoring.value;
+        const e = init.steerco_scoring.ease;
+        const cx = toX(e), cy = toY(v);
+        const color = colors[i % colors.length];
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+        ctx.fillStyle = color + '40';
+        ctx.fill();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '10px Outfit, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(init.name.length > 20 ? init.name.slice(0, 18) + '..' : init.name, cx, cy - 12);
+    });
+
+    // Legend
+    const legendX = W - 140, legendY = pad.top + 10;
+    ctx.fillStyle = '#0f172a';
+    ctx.font = '11px Outfit, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Approved Initiatives', legendX, legendY);
+    approved.forEach((init, i) => {
+        const ly = legendY + 16 + i * 16;
+        const color = colors[i % colors.length];
+        ctx.fillStyle = color;
+        ctx.fillRect(legendX, ly - 5, 8, 8);
+        ctx.fillStyle = '#475569';
+        ctx.font = '10px Outfit, sans-serif';
+        ctx.fillText(init.request_number, legendX + 12, ly + 2);
+    });
 }
 
 // ============================================================
