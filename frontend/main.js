@@ -622,6 +622,7 @@ function switchView(viewId) {
 
     const routeHandlers = {
         'reporting': renderReports,
+        'initiatives-list': renderInboxLists,
         'strategic-classification': renderStrategicClassificationList,
         'steerco-scoring': renderSteercoScoringList
     };
@@ -768,6 +769,22 @@ function renderOverviewStats() {
 // INBOX & LIST RENDERING
 // ============================================================
 
+let _listFilter = 'all';
+let _listSearch = '';
+
+function searchInitiatives(term) {
+    _listSearch = term.trim().toLowerCase();
+    renderInboxLists();
+}
+
+function showFilteredList(filter) {
+    _listFilter = filter;
+    _listSearch = '';
+    const searchInput = document.getElementById('initiativeSearch');
+    if (searchInput) searchInput.value = '';
+    switchView('initiatives-list');
+}
+
 function renderInboxLists() {
     const inbox = document.getElementById('actionInboxList');
     const registry = document.getElementById('fullInitiativesList');
@@ -794,10 +811,33 @@ function renderInboxLists() {
     if (registry) {
         registry.innerHTML = '';
         const fragment = document.createDocumentFragment();
-        initiatives.forEach(init => {
+        const statusFiltered = _listFilter === 'all' ? initiatives :
+            _listFilter === 'pending' ? initiatives.filter(i => i.status !== 'Approved' && i.status !== 'Declined') :
+            _listFilter === 'approved' ? initiatives.filter(i => i.status === 'Approved') :
+            _listFilter === 'declined' ? initiatives.filter(i => i.status === 'Declined' || i.status === 'Parked') :
+            initiatives;
+        const filtered = _listSearch
+            ? statusFiltered.filter(i => (i.name || '').toLowerCase().includes(_listSearch))
+            : statusFiltered;
+        filtered.forEach(init => {
             fragment.appendChild(createInitiativeCard(init));
         });
         registry.appendChild(fragment);
+
+        const filterBar = document.getElementById('listFilterBar');
+        if (filterBar) {
+            const labels = { all: 'All Initiatives', pending: 'Pending', approved: 'Approved', declined: 'Declined / Parked' };
+            const currentLabel = labels[_listFilter] || 'All Initiatives';
+            if (_listFilter === 'all') {
+                filterBar.innerHTML = `<span style="font-size:0.9rem;color:var(--text-secondary);">Showing <strong>${filtered.length}</strong> initiative(s)</span>`;
+            } else {
+                filterBar.innerHTML = `
+                    <span style="font-size:0.9rem;color:var(--text-secondary);">
+                        Filtered: <strong>${currentLabel}</strong> — <strong>${filtered.length}</strong> initiative(s)
+                        <a href="#" onclick="showFilteredList('all');return false;" style="color:var(--accent);margin-left:12px;text-decoration:none;font-weight:500;">Clear filter</a>
+                    </span>`;
+            }
+        }
     }
 }
 
@@ -1360,6 +1400,7 @@ function classifyInitiative(id) {
     const matrix = document.getElementById('strategicClassificationMatrix');
     if (!matrix) return;
     matrix.style.display = 'block';
+    setTimeout(() => matrix.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
 
     const saved = initiative.strategic_classification?.scores || {};
     Store.set('pendingScores', new Map(Object.entries(saved)));
@@ -1584,6 +1625,7 @@ function calculateSteercoScore(id) {
     const matrix = document.getElementById('steercoScoringMatrix');
     if (!matrix) return;
     matrix.style.display = 'block';
+    setTimeout(() => matrix.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
 
     const sc = initiative.strategic_classification;
     let scNumeric = 5;
@@ -1776,6 +1818,52 @@ function renderReports() {
     if (reportValue) reportValue.innerText = formatCurrency(totalVal);
 
     drawValueEaseChart(initiatives);
+}
+
+function exportApprovedCSV() {
+    const initiatives = Store.get('initiatives');
+    const approved = initiatives.filter(i => i.status === 'Approved');
+    if (approved.length === 0) {
+        showToast('No approved initiatives to export.', 'warning');
+        return;
+    }
+
+    const rows = [['Request No','Initiative Name','Requester','Owner','Strategy Pillar','Capability Type','Capability Group','Status','Estimated Budget','Strategic Classification Score','Strategic Category','SteerCo Value','SteerCo Ease','Business Case','SolArch Report','Approval Date']];
+    approved.forEach(init => {
+        const sc = init.strategic_classification || {};
+        const ss = init.steerco_scoring || {};
+        rows.push([
+            init.request_number || '',
+            init.name || '',
+            init.requester_name || '',
+            init.owner_name || '',
+            init.alignment_strategy || '',
+            init.capability_type || '',
+            init.capability_group || '',
+            init.status || '',
+            init.budget_estimate || 0,
+            sc.total_weighted_score ?? '',
+            sc.category || '',
+            ss.value ?? '',
+            ss.ease ?? '',
+            init.business_case_status || '',
+            init.solarch_report_status || '',
+            init.decision_date ? new Date(init.decision_date).toLocaleDateString() : ''
+        ]);
+    });
+
+    const csv = rows.map(r => r.map(c => {
+        const s = String(c);
+        return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }).join(',')).join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'approved_initiatives_' + new Date().toISOString().slice(0, 10) + '.csv';
+    link.click();
+    URL.revokeObjectURL(link.href);
+    showToast('Exported ' + approved.length + ' approved initiative(s).', 'success');
 }
 
 function drawValueEaseChart(initiatives) {

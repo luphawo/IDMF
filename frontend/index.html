@@ -32,7 +32,7 @@
                 <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
                 Overview Dashboard
             </li>
-            <li class="nav-item" onclick="switchView('initiatives-list')">
+            <li class="nav-item" onclick="showFilteredList('all')">
                 <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
                 Initiatives Registry
             </li>
@@ -84,19 +84,19 @@
         <!-- ==================== VIEW: OVERVIEW ==================== -->
         <section id="view-overview" class="view-section active" aria-label="Overview Dashboard">
             <div class="stats-grid" role="region" aria-label="Key statistics">
-                <div class="stat-card">
+                <div class="stat-card" onclick="showFilteredList('all')" style="cursor:pointer;">
                     <span class="stat-title">Registered Initiatives</span>
                     <span class="stat-val" id="statTotal" aria-live="polite">0</span>
                 </div>
-                <div class="stat-card warning">
+                <div class="stat-card warning" onclick="showFilteredList('pending')" style="cursor:pointer;">
                     <span class="stat-title">Pending Governance Actions</span>
                     <span class="stat-val" id="statPending" aria-live="polite">0</span>
                 </div>
-                <div class="stat-card success">
+                <div class="stat-card success" onclick="showFilteredList('approved')" style="cursor:pointer;">
                     <span class="stat-title">Approved Projects</span>
                     <span class="stat-val" id="statApproved" aria-live="polite">0</span>
                 </div>
-                <div class="stat-card danger">
+                <div class="stat-card danger" onclick="showFilteredList('declined')" style="cursor:pointer;">
                     <span class="stat-title">Declined/Parked</span>
                     <span class="stat-val" id="statDeclined" aria-live="polite">0</span>
                 </div>
@@ -114,6 +114,10 @@
 
         <!-- ==================== VIEW: INITIATIVES LIST ==================== -->
         <section id="view-initiatives-list" class="view-section" aria-label="Initiatives Registry">
+            <div id="listFilterBar" style="margin-bottom:16px;"></div>
+            <div style="margin-bottom:16px;">
+                <input type="text" id="initiativeSearch" class="form-input" placeholder="Search by Initiative Name / Title..." oninput="searchInitiatives(this.value)" style="max-width:400px;">
+            </div>
             <div class="card-list" id="fullInitiativesList" role="list" aria-label="All initiatives">
                 <!-- Full list rendered dynamically -->
             </div>
@@ -337,8 +341,15 @@
                 <canvas id="valueEaseChart" width="700" height="400" style="width:100%;max-width:700px;aspect-ratio:7/4;background:var(--bg-card);border-radius:12px;border:1px solid var(--border);margin-bottom:24px;"></canvas>
             </div>
             <div class="form-card">
-                <h3>Executive Portfolio Governance Report</h3>
-                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 24px;">Generated on demand. Deeply integrated with Microsoft Power BI feeds.</p>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+                    <div>
+                        <h3 style="margin:0;">Executive Portfolio Governance Report</h3>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin:4px 0 0;">Generated on demand. Deeply integrated with Microsoft Power BI feeds.</p>
+                    </div>
+                    <button class="action-btn" onclick="exportApprovedCSV()" style="background:var(--success);white-space:nowrap;">
+                        Export Approved CSV
+                    </button>
+                </div>
                 <div style="overflow-x: auto;">
                     <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;" id="reportTable" role="table" aria-label="Executive portfolio report">
                         <thead>
