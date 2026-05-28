@@ -1053,62 +1053,6 @@ function renderDetailContent(initiative, history) {
     }
 }
 
-function renderDocumentationLinks(initiative) {
-    const docs = document.getElementById('detailExtraDocs');
-    if (!docs) return;
-
-    docs.style.display = 'none';
-
-    if (initiative.status !== 'Submitted' && initiative.status !== 'Accepted') {
-        docs.style.display = 'flex';
-
-        const bcLink = document.getElementById('businessCaseLink');
-        const solarchLink = document.getElementById('solarchReportLink');
-
-        if (bcLink) {
-            bcLink.innerHTML = `Business Case Status: <strong>${escapeHtml(initiative.business_case_status)}</strong> <br><small>${escapeHtml(initiative.business_case_url || 'https://sharepoint.unisa.local/bc')}</small>`;
-        }
-        if (solarchLink) {
-            if (initiative.solarch_report_status === 'Completed') {
-                solarchLink.innerHTML = `Solutions Architecture Report: <strong>${escapeHtml(initiative.solarch_report_status)}</strong> <br><small>${escapeHtml(initiative.solarch_report_url || 'https://sharepoint.unisa.local/report')}</small>`;
-            } else {
-                solarchLink.innerHTML = `SolArch Assessment Report: <span style="color:var(--warning)">In-Progress</span>`;
-            }
-        }
-    }
-
-    const strategicClassLink = document.getElementById('strategicClassLink');
-    if (strategicClassLink) {
-        strategicClassLink.style.display = 'none';
-        if (initiative.strategic_classification) {
-            strategicClassLink.style.display = 'block';
-            const sc = initiative.strategic_classification;
-            const impact = deriveStrategicImpact(sc);
-            strategicClassLink.innerHTML = `
-                <strong>Strategic Classification:</strong>
-                Total Score: <strong>${formatNumber(sc.total_weighted_score)}</strong> |
-                Category: <strong>${escapeHtml(sc.category)}</strong> |
-                Impact: <strong>${escapeHtml(impact)}</strong>
-            `;
-        }
-    }
-
-    const steercoScoringLink = document.getElementById('steercoScoringLink');
-    if (steercoScoringLink) {
-        steercoScoringLink.style.display = 'none';
-        if (initiative.steerco_scoring) {
-            steercoScoringLink.style.display = 'block';
-            const ss = initiative.steerco_scoring;
-            steercoScoringLink.innerHTML = `
-                <strong>SteerCo Scoring:</strong>
-                Value: <strong>${formatNumber(ss.value)}</strong> |
-                Ease: <strong>${formatNumber(ss.ease)}</strong> |
-                Scored: <strong>${escapeHtml(formatDate(ss.scoring_date))}</strong>
-            `;
-        }
-    }
-}
-
 // ============================================================
 // DYNAMIC ACTION WORKSTATION (Refactored State Machine)
 // ============================================================
@@ -1857,12 +1801,18 @@ function exportApprovedCSV() {
         return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
     }).join(',')).join('\n');
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
+    link.href = url;
     link.download = 'approved_initiatives_' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(link.href);
+    setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }, 1000);
     showToast('Exported ' + approved.length + ' approved initiative(s).', 'success');
 }
 

@@ -59,11 +59,13 @@
         <div class="identity-switch">
             <h3>🔑 Switch Active Persona</h3>
             <select class="identity-select" id="personaSelect" onchange="changePersona()" aria-label="Select user persona">
-                <option value="requester" data-name="Jane Doe" data-email="jane.doe@unisa.ac.za" data-unit="Academic Affairs" data-role="Initiative Requester">Jane Doe (Requester)</option>
-                <option value="owner" data-name="Vusi Executive" data-email="vusi.executive@unisa.ac.za" data-unit="Deputy Registrar Portfolio" data-role="Initiative Owner">Vusi Executive (Owner)</option>
-                <option value="planner" data-name="Sello Demand" data-email="sello.planner@unisa.ac.za" data-unit="ICT PMO" data-role="Demand Planner">Sello Demand (Planner)</option>
-                <option value="arch" data-name="Dev Solutions" data-email="dev.arch@unisa.ac.za" data-unit="Enterprise Architecture" data-role="Solutions Architect">Dev Solutions (Architect)</option>
-                <option value="secretariat" data-name="Naledi Steerco" data-email="naledi.steerco@unisa.ac.za" data-unit="ICT SteerCo" data-role="ICT SteerCo Secretariat">Naledi SteerCo (Secretariat)</option>
+                <option value="requester" data-name="Jane Doe" data-email="jane.doe@unisa.ac.za" data-unit="Academic Affairs" data-role="Requester">Jane Doe (Requester)</option>
+                <option value="owner" data-name="Vusi Executive" data-email="vusi.executive@unisa.ac.za" data-unit="Deputy Registrar Portfolio" data-role="Owner">Vusi Executive (Owner)</option>
+                <option value="planner" data-name="Sello Demand" data-email="sello.planner@unisa.ac.za" data-unit="ICT PMO" data-role="Planner">Sello Demand (Planner)</option>
+                <option value="reviewer" data-name="Thandi Review" data-email="thandi.review@unisa.ac.za" data-unit="Enterprise Architecture" data-role="Reviewer">Thandi Review (Reviewer)</option>
+                <option value="assessor" data-name="Alex Assess" data-email="alex.assess@unisa.ac.za" data-unit="Enterprise Architecture" data-role="Assessor">Alex Assess (Assessor)</option>
+                <option value="solarch" data-name="Dev Solutions" data-email="dev.arch@unisa.ac.za" data-unit="Enterprise Architecture" data-role="SolArch">Dev Solutions (SolArch)</option>
+                <option value="steerco" data-name="Naledi Steerco" data-email="naledi.steerco@unisa.ac.za" data-unit="ICT SteerCo" data-role="ICT SteerCo">Naledi SteerCo (ICT SteerCo)</option>
             </select>
         </div>
     </aside>
@@ -323,15 +325,15 @@
                 </div>
                 <div class="stat-card">
                     <span class="stat-title">SLA Compliance Target</span>
-                    <span class="stat-val">97.8%</span>
+                    <span class="stat-val" id="reportSLA">--</span>
                 </div>
                 <div class="stat-card warning">
                     <span class="stat-title">Avg Governance Stage Time</span>
-                    <span class="stat-val">4.2 Days</span>
+                    <span class="stat-val" id="reportStageTime">--</span>
                 </div>
                 <div class="stat-card">
                     <span class="stat-title">Strategic Traceability</span>
-                    <span class="stat-val">100%</span>
+                    <span class="stat-val" id="reportTraceability">--</span>
                 </div>
             </div>
 

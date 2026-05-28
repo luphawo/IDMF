@@ -59,35 +59,39 @@ Start-Process -FilePath "node" -ArgumentList "backend/dist/server.js" -WindowSty
 ## Workflow States
 
 ```
-Submitted → Accepted → Reviewed → SolArch → Assessed → Recommended → Approved
-                                      ↓                      ↓
-                                   Parked              Declined / Referred Back
+Submitted ──→ Accepted ──→ Reviewed ──→ SolArch ──→ Assessed ──→ Recommended ──→ Approved
+    │              │                                           │                    │
+    │              ├── Parked                                  ├── Declined         ├── Declined
+    └── Referred   └── (Unpark → Accepted)                    └── Referred Back    └── Referred Back
+        Back
 ```
 
-| State | Description |
-|---|---|
-| Submitted | Initiative registered by Requester |
-| Accepted | Accepted by Initiative Owner |
-| Reviewed | Assigned to Architect for review |
-| SolArch | Solutions Architecture assessment in progress |
-| Assessed | Architecture assessment completed |
-| Recommended | Recommended to ICT SteerCo |
-| Approved | Approved by ICT SteerCo Secretariat |
-| Parked | Temporarily parked by Demand Planner |
-| Declined | Rejected at any stage |
-| Referred Back | Sent back for revision |
+| State | Description | Responsible Role |
+|---|---|---|
+| Submitted | Initiative registered by Requester | Owner (Accept / Decline / Refer Back) |
+| Accepted | Accepted by Owner | Planner (Assign to Reviewer / Assessor / Park) |
+| Reviewed | Assigned to Reviewer | Reviewer (SC + Submit Review) |
+| SolArch | Assigned to Assessor | Assessor (Submit Assessment) |
+| Assessed | Assessment completed | SolArch (Recommend / Decline / Refer Back) |
+| Recommended | Recommended to ICT SteerCo | ICT SteerCo (SteerCo Scoring + Approve / Decline / Refer Back) |
+| Approved | Approved by ICT SteerCo | — |
+| Parked | Temporarily parked | Planner (Unpark) |
+| Declined | Rejected at any stage | — |
+| Referred Back | Sent back for revision | — |
 
 ## Personas (Mock Auth)
 
 The application uses request header-based authentication. Select a persona from the sidebar to switch roles.
 
-| Persona | Header Role |
-|---|---|
-| Jane Doe (Requester) | Initiative Requester |
-| Vusi Executive (Owner) | Initiative Owner |
-| Sello Demand (Planner) | Demand Planner |
-| Dev Solutions (Architect) | Solutions Architect |
-| Naledi SteerCo (Secretariat) | ICT SteerCo Secretariat |
+| Persona | Role | Permissions |
+|---|---|---|
+| Jane Doe (Requester) | Requester | Submit initiative |
+| Vusi Executive (Owner) | Owner | Accept, Decline, Refer Back |
+| Sello Demand (Planner) | Planner | Assign to Reviewer, Assign to Assessor, Park, Unpark |
+| Thandi Review (Reviewer) | Reviewer | Complete Strategic Classification, Submit Review |
+| Alex Assess (Assessor) | Assessor | Submit Assessment |
+| Dev Solutions (SolArch) | SolArch | Recommend, Decline, Refer Back |
+| Naledi SteerCo (ICT SteerCo) | ICT SteerCo | Complete SteerCo Scoring, Approve, Decline, Refer Back |
 
 ## API Endpoints
 

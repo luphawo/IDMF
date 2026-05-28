@@ -119,7 +119,7 @@ router.post('/:id/accept', (req, res) => {
     try {
         const user = req.user;
         const { id } = req.params;
-        const { action, comments } = req.body; // 'Accept' | 'Decline'
+        const { action, comments } = req.body; // 'Accept' | 'Decline' | 'Referred Back'
         const initiative = dbService_1.DbService.getInitiativeById(id);
         if (!initiative) {
             return res.status(404).json({ success: false, message: "Initiative not found" });
@@ -165,8 +165,27 @@ router.post('/:id/accept', (req, res) => {
                 data: updated
             });
         }
+        else if (action === 'Referred Back') {
+            const updated = dbService_1.DbService.updateInitiative(id, {
+                status: 'Referred Back',
+                decline_reason: comments || 'Referred back to Requester'
+            });
+            dbService_1.DbService.addHistory({
+                initiative_id: id,
+                from_status: originalStatus,
+                to_status: 'Referred Back',
+                updated_by_email: user.email,
+                updated_by_name: user.name,
+                comments: comments || "Initiative referred back by Owner."
+            });
+            return res.json({
+                success: true,
+                message: "Initiative referred back to Requester.",
+                data: updated
+            });
+        }
         else {
-            return res.status(400).json({ success: false, message: "Invalid action. Use 'Accept' or 'Decline'." });
+            return res.status(400).json({ success: false, message: "Invalid action. Use 'Accept', 'Decline', or 'Referred Back'." });
         }
     }
     catch (error) {
@@ -180,7 +199,7 @@ router.post('/:id/assign', (req, res) => {
     try {
         const user = req.user;
         const { id } = req.params;
-        const { reviewer_email, reviewer_name, action } = req.body; // action can also be 'Park'
+        const { reviewer_email, reviewer_name, assessor_email, assessor_name, action } = req.body; // 'AssignReviewer' | 'AssignAssessor' | 'Park'
         const initiative = dbService_1.DbService.getInitiativeById(id);
         if (!initiative) {
             return res.status(404).json({ success: false, message: "Initiative not found" });
@@ -196,29 +215,52 @@ router.post('/:id/assign', (req, res) => {
                 to_status: 'Parked',
                 updated_by_email: user.email,
                 updated_by_name: user.name,
-                comments: "Initiative has been parked by Demand Planner."
+                comments: "Initiative has been parked."
             });
-            webhookService_1.WebhookService.triggerPowerAutomate("Demand Planner Parked", updated);
+            webhookService_1.WebhookService.triggerPowerAutomate("Planner Parked", updated);
             return res.json({ success: true, message: "Initiative status set to Parked.", data: updated });
         }
-        if (!reviewer_email || !reviewer_name) {
-            return res.status(400).json({ success: false, message: "Reviewer name and email are mandatory for assignment." });
+        if (action === 'AssignReviewer') {
+            if (!reviewer_email || !reviewer_name) {
+                return res.status(400).json({ success: false, message: "Reviewer name and email are mandatory." });
+            }
+            const updated = dbService_1.DbService.updateInitiative(id, {
+                status: 'Reviewed',
+                reviewer_email,
+                reviewer_name
+            });
+            dbService_1.DbService.addHistory({
+                initiative_id: id,
+                from_status: originalStatus,
+                to_status: 'Reviewed',
+                updated_by_email: user.email,
+                updated_by_name: user.name,
+                comments: `Assigned to Reviewer: ${reviewer_name}`
+            });
+            webhookService_1.WebhookService.triggerPowerAutomate("Assigned to Reviewer", updated);
+            return res.json({ success: true, message: "Initiative assigned to Reviewer.", data: updated });
         }
-        const updated = dbService_1.DbService.updateInitiative(id, {
-            status: 'Reviewed',
-            reviewer_email,
-            reviewer_name
-        });
-        dbService_1.DbService.addHistory({
-            initiative_id: id,
-            from_status: originalStatus,
-            to_status: 'Reviewed',
-            updated_by_email: user.email,
-            updated_by_name: user.name,
-            comments: `Assigned to Reviewer: ${reviewer_name}`
-        });
-        webhookService_1.WebhookService.triggerPowerAutomate("Assigned to Reviewer", updated);
-        res.json({ success: true, message: "Initiative assigned successfully.", data: updated });
+        if (action === 'AssignAssessor') {
+            if (!assessor_email || !assessor_name) {
+                return res.status(400).json({ success: false, message: "Assessor name and email are mandatory." });
+            }
+            const updated = dbService_1.DbService.updateInitiative(id, {
+                status: 'SolArch',
+                reviewer_email: assessor_email,
+                reviewer_name: assessor_name
+            });
+            dbService_1.DbService.addHistory({
+                initiative_id: id,
+                from_status: originalStatus,
+                to_status: 'SolArch',
+                updated_by_email: user.email,
+                updated_by_name: user.name,
+                comments: `Assigned to Assessor: ${assessor_name}`
+            });
+            webhookService_1.WebhookService.triggerPowerAutomate("Assigned to Assessor", updated);
+            return res.json({ success: true, message: "Initiative assigned to Assessor.", data: updated });
+        }
+        return res.status(400).json({ success: false, message: "Invalid action. Use 'AssignReviewer', 'AssignAssessor', or 'Park'." });
     }
     catch (error) {
         res.status(500).json({ success: false, message: error.message });
